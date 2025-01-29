@@ -11,10 +11,10 @@ const config = {
   title: 'AWS Cloud Operations Best Practices',
 
   // Set the production url of your site here
-  url: 'https://aws-samples.github.io/',
+  url: 'https://aws-samples.github.io/cloud-operations-best-practices',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/cloud-operations-best-practices/',
+  baseUrl: '/',
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
