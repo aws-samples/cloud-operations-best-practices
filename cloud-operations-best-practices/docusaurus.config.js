@@ -18,8 +18,8 @@ const config = {
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'AWS', // Usually your GitHub org/user name.
-  projectName: 'AWS Cloud Operations best practices', // Usually your repo name.
+  organizationName: 'aws-samples', // Usually your GitHub org/user name.
+  projectName: 'cloud-operations-best-practices', // Usually your repo name.
 
   onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
