@@ -1,5 +1,5 @@
 ---
 sidebar_position: 2
 ---
-# AWS CloudTrail - Solutions
+# AWS CloudTrail
 ## Coming Soon...

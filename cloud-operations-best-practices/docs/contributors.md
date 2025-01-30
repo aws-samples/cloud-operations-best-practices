@@ -11,7 +11,7 @@ people:
 
 | Authors             | Authors                     | Authors           | Authors            |
 | ------------------- | --------------------------- | ----------------- | ------------------ |
-| Isaiah Salinas      | Nereida Woo                 |                   |                    |
+| Isaiah Salinas      | Nereida Woo                 | Erik Weber        | Brad Gilomen       |
 
 
 

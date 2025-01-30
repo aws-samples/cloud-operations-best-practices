@@ -1,5 +1,5 @@
 ---
 sidebar_position: 3
 ---
-# Application Operations - FAQ
+# Application Operations
 ## Coming Soon...

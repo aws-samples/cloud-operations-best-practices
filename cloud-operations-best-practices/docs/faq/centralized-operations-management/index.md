@@ -1,6 +1,5 @@
 ---
 sidebar_position: 4
 ---
-# AWS Systems Manager
-
+# Centralized Operations Management
 ## Coming Soon...
