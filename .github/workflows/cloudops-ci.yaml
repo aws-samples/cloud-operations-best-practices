@@ -19,6 +19,7 @@ jobs:
       - name: Build
         run: |
           cd cloud-operations-best-practices
+          npm install aws-rum-web
           yarn install
           yarn build
       - uses: peaceiris/actions-gh-pages@v3
