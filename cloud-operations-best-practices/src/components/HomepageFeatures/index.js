@@ -45,6 +45,16 @@ const FeatureList = [
     ),
     link: '/docs/faq/',
   },
+  {
+    title: 'Observability',
+    Svg: require('@site/static/img/observability.svg').default,
+    description: (
+      <>
+        Learn about AWS Observability Best Practices.
+      </>
+    ),
+    link: 'https://aws-observability.github.io/observability-best-practices/',
+  },
 ];
 
 function Feature({Svg, title, description, link}) {

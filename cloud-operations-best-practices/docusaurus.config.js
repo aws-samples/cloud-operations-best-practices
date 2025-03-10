@@ -9,6 +9,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'AWS Cloud Operations Best Practices',
+  favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
   url: 'https://aws-samples.github.io/',
