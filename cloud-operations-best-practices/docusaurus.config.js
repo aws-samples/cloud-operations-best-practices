@@ -70,7 +70,7 @@ const config = {
             type: 'doc',
             docId: 'tools/index',
             position: 'left',
-            label: 'Tools',
+            label: 'Solutions',
           },
           {
             type: 'doc',

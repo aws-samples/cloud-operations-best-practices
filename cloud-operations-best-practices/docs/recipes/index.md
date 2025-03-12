@@ -2,5 +2,6 @@
 sidebar_position: 4
 ---
 
-# Guidance
+# Recipes
+
 ## Coming Soon...
