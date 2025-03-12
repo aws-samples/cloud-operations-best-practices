@@ -6,7 +6,7 @@ import styles from './styles.module.css';
 
 const FeatureList = [
   {
-    title: 'Best Practices',
+    title: 'Guides',
     Svg: require('@site/static/img/guide.svg').default,
     description: (
       <>
@@ -44,6 +44,16 @@ const FeatureList = [
       </>
     ),
     link: '/docs/faq/',
+  },
+  {
+    title: 'Resources',
+    Svg: require('@site/static/img/signals.svg').default,
+    description: (
+      <>
+        Access resources related to AWS Cloud Operations Best Practices, such as interactive demos, YouTube videos, and more.
+      </>
+    ),
+    link: '/docs/resources/',
   },
   {
     title: 'Observability',

@@ -1,5 +1,5 @@
 ---
-sidebar_position: 6
+sidebar_position: 7
 ---
 
 # Contributors
@@ -12,9 +12,6 @@ people:
 | Authors             | Authors                     | Authors           | Authors            |
 | ------------------- | --------------------------- | ----------------- | ------------------ |
 | Isaiah Salinas      | Nereida Woo                 | Erik Weber        | Brad Gilomen       |
-
-
-
 
 Note that all recipes published on this site are available via the
 [MIT-0][mit0] license, a modification to the usual MIT license
