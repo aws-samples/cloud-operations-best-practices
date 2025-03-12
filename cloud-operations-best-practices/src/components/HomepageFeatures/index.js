@@ -16,7 +16,7 @@ const FeatureList = [
     link: '/docs/guides',
   },
   {
-    title: 'Tools',
+    title: 'Solutions',
     Svg: require('@site/static/img/tools.svg').default,
     description: (
       <>
