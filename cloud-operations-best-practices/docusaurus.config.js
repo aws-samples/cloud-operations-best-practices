@@ -64,7 +64,7 @@ const config = {
             type: 'doc',
             docId: 'guides/index',
             position: 'left',
-            label: 'Best Practices',
+            label: 'Guides',
           },
           {
             type: 'doc',
@@ -89,6 +89,12 @@ const config = {
             docId: 'contributors',
             position: 'left',
             label: 'Contributors',
+          },
+          {
+            type: 'doc',
+            docId: 'resources/index',
+            position: 'left',
+            label: 'Resources',
           },
           {
             type: 'localeDropdown',
