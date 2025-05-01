@@ -51,7 +51,7 @@ Resources:
       - Key: AWSSamples
         Value: Just-in-time-Node-Access
 
-  ManualApprovalPolicy:
+  ManualApprovalPolicyEcommerceApplication:
     Type: AWS::SSM::Document
     Properties:
       Content:
@@ -60,9 +60,9 @@ Resources:
         description: ''
         accessTokenRole: SSM-JustInTimeAccessTokenRole
         targets:
-        - Key: tag:ENV
+        - Key: tag:Workload
           Values:
-          - PROD
+          - E-commerce
         mainSteps:
         - name: ManualApproval
           action: aws:approve
@@ -76,7 +76,37 @@ Resources:
                 type: SSOGroup
       DocumentFormat: YAML
       DocumentType: ManualApprovalPolicy
-      Name: Production-Manual-Approval-Policy
+      Name: E-commerce-Manual-Approval-Policy
+      Tags:
+      - Key: AWSSamples
+        Value: Just-in-time-Node-Access
+
+  ManualApprovalPolicyFinanceApplication:
+    Type: AWS::SSM::Document
+    Properties:
+      Content:
+        schemaVersion: '0.3'
+        accessDuration: 86400
+        description: ''
+        accessTokenRole: SSM-JustInTimeAccessTokenRole
+        targets:
+        - Key: tag:Workload
+          Values:
+          - FinanceApplication
+        mainSteps:
+        - name: ManualApproval
+          action: aws:approve
+          timeoutSeconds: 604800
+          inputs:
+            Message: Please approve this request
+            MinRequiredApprovals: 1
+            EnhancedApprovals:
+              Approvers:
+              - approver: ec4df598-7071-70a6-0de4-f06c8908bac5
+                type: SSOGroup
+      DocumentFormat: YAML
+      DocumentType: ManualApprovalPolicy
+      Name: FinanceApplication-Manual-Approval-Policy
       Tags:
       - Key: AWSSamples
         Value: Just-in-time-Node-Access
