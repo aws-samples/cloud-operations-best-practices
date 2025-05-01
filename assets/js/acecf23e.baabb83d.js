@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkaws_cloud_operations_best_practices=self.webpackChunkaws_cloud_operations_best_practices||[]).push([[1903],{1912:s=>{s.exports=JSON.parse('{"blogBasePath":"/cloud-operations-best-practices/blog","blogTitle":"Blog","authorsListPath":"/cloud-operations-best-practices/blog/authors"}')}}]);
