@@ -43,6 +43,18 @@ The following example CloudFormation template includes creating the two required
 
 [Just-in-time node access sample CFN template](/cloud-operations-best-practices/static/cfn-templates/just-in-time-node-access/just-in-time-quick-setup-cfn-template.yaml)
 
+##### CloudFormation template parameters
+
+| Parameter Name | Description | Example value |
+| -------------- | ----------- | ------------- |
+| `DelegatedAdminAccountId` | AWS Account ID for the Systems Manager delegated administrator account. | 123456789012 |
+| `HomeRegion` | AWS Region where the Systems Manager unified console is deployed. | us-east-1 |
+| `IdentityProviderSetting` | Specifies identity provider IAM Identity Access Management (IAM) or Single Sign-On (SSO) used for determining who is the current access control template approver. | IAM |
+| `JITNATargetOrganizationalUnits` | Comma-separated list of AWS Organization Unit IDs where just-in-time node access is set up. | ou-a1b2-abcd1234,ou-a1b2-efgh1234,ou-a1b2-hijk1234 |
+| `JITNATargetRegions` | The Regions where you want to enable just-in-time node access. The Regions specified must either match the Regions specified in the parameter `UnifiedConsoleTargetRegions` or must be a subset of Regions specified in the parameter `UnifiedConsoleTargetRegions`. | us-east-1,us-east-2,us-west-2 |
+| `UnifiedConsoleRootOrganizationUnitID` | The root AWS Organization unit ID. | r-abcd |
+| `UnifiedConsoleTargetRegions` | Comma-separated list of AWS Regions where the Systems Manager unified console is set up. Data is aggregated from these Regions and replicated to your home Region. | us-east-1,us-east-2,us-west-2 |
+
 ## Configure just-in-time node access
 
 After you have enabled just-in-time node access for your environment, you can then begin deploying approval policies, session preferences, and notification configurations.

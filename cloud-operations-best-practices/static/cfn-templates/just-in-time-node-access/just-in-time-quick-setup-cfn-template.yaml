@@ -37,7 +37,7 @@ Metadata:
       - Label:
           default: "Unifed console parameters"
         Parameters:
-          - UnifiedConsoleTargetOrganizationalUnits
+          - UnifiedConsoleRootOrganizationUnitID
           - UnifiedConsoleTargetRegions
       - Label:
           default: "Just-in-time node access parameters"
@@ -52,7 +52,7 @@ Metadata:
         default: "Home Region"
       IdentityProviderSetting:
         default: "Identity Provider Setting"
-      UnifiedConsoleTargetOrganizationalUnits:
+      UnifiedConsoleRootOrganizationUnitID:
         default: "Unified console target organizational units"
       UnifiedConsoleTargetRegions:
         default: "Unified console target Regions"
@@ -91,10 +91,10 @@ Parameters:
     AllowedValues:
       - IAM
       - SSO
-  UnifiedConsoleTargetOrganizationalUnits:
+  UnifiedConsoleRootOrganizationUnitID:
     Type: String
-    Description: The root AWS Organization unit.
-    Default: r-7ky5
+    Description: The root AWS Organization unit ID.
+    Default: r-abcd
     AllowedPattern: ^(r-[0-9a-z]{4,32})$
   UnifiedConsoleTargetRegions:
     Type: String
@@ -190,7 +190,7 @@ Resources:
           Parameters:
             DelegatedAccountId: !Ref DelegatedAdminAccountId
             HomeRegion: !Ref HomeRegion
-            TargetOrganizationalUnits: !Ref UnifiedConsoleTargetOrganizationalUnits
+            TargetOrganizationalUnits: !Ref UnifiedConsoleRootOrganizationUnitID
             TargetRegions: !Ref UnifiedConsoleTargetRegions
       Tags:
         AWSSamples: Just-in-time-Node-Access
