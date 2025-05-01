@@ -1,8 +1,8 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 ---
 
-# Just-in-time node access (JITNA) samples
+# JITNA Cedar policy examples
 
 This section contains a collection of samples of policy examples when using Systems Manager just-in-time node access (JITNA).
 

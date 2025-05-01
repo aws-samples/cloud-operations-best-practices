@@ -19,23 +19,69 @@
 #------------------------------------------------------------------------------
 #
 # Template: just-in-time-quick-setup-cfn-template.yaml
-# Purpose: CloudFormation template to deploy a Quick Setup configuration for the Systems Manager unified console and just-in-time node access.
+# Purpose: CloudFormation template to deploy a Quick Setup configuration manager for the Systems Manager unified console and just-in-time node access.
 #
 #------------------------------------------------------------------------------
 
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation template to deploy a Quick Setup configuration for
+Description: CloudFormation template to deploy a Quick Setup configuration manager for
   the Systems Manager unified console and just-in-time node access.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Systems Manager delegated administrator parameters"
+        Parameters:
+          - DelegatedAdminAccountId
+          - HomeRegion
+      - Label:
+          default: "Unifed console parameters"
+        Parameters:
+          - UnifiedConsoleTargetOrganizationalUnits
+          - UnifiedConsoleTargetRegions
+      - Label:
+          default: "Just-in-time node access parameters"
+        Parameters:
+          - JITNATargetOrganizationalUnits
+          - JITNATargetRegions
+          - IdentityProviderSetting
+    ParameterLabels:
+      DelegatedAdminAccountId:
+        default: "Delegated Administrator ID"
+      HomeRegion:
+        default: "Home Region"
+      IdentityProviderSetting:
+        default: "Identity Provider Setting"
+      UnifiedConsoleTargetOrganizationalUnits:
+        default: "Unified console target organizational units"
+      UnifiedConsoleTargetRegions:
+        default: "Unified console target Regions"
+      JITNATargetOrganizationalUnits:
+        default: "Just-in-time node access target organizational units"
+      JITNATargetRegions:
+        default: "Just-in-time node access target Regions"
+      
 Parameters:
-  DelegatedAccountId:
+  DelegatedAdminAccountId:
     Type: String
     Description: AWS Account ID for the Systems Manager delegated administrator account.
-    Default: '975050142151'
+    Default: "123456789012"
     AllowedPattern: ^\d{12}$
   HomeRegion:
     Type: String
     Description: AWS Region where the Systems Manager unified console is deployed.
-    Default: ca-central-1
+    Default: us-east-1
+    AllowedValues:
+      - us-east-1
+      - us-east-2
+      - us-west-1
+      - us-west-2
+      - eu-central-1
+      - eu-west-1
+      - eu-west-2
+      - ap-northeast-1
+      - ap-southeast-2
+      - ca-central-1
   IdentityProviderSetting:
     Type: String
     Description: (Optional) Specifies identity provider IAM Identity Access
@@ -47,25 +93,26 @@ Parameters:
       - SSO
   UnifiedConsoleTargetOrganizationalUnits:
     Type: String
-    Description: AWS Account IDs where the Systems Manager unified console is deployed.
-    Default: r-md7w
+    Description: The root AWS Organization unit.
+    Default: r-7ky5
+    AllowedPattern: ^(r-[0-9a-z]{4,32})$
   UnifiedConsoleTargetRegions:
     Type: String
     Description: Comma-separated list of AWS Regions where the Systems Manager
       unified console is set up. Data is aggregated from these Regions and
       replicated to your home Region.
-    Default: ca-central-1
+    Default: us-east-1,us-east-2,us-west-2
   JITNATargetOrganizationalUnits:
     Type: String
-    Description: AWS Account IDs where just-in-time node access is set up.
-    Default: r-md7w
+    Description: Comma-separated list of AWS Organization Unit IDs where just-in-time node access is set up.
+    Default: ""
   JITNATargetRegions:
     Type: String
     Description: The Regions where you want to enable just-in-time node access. The
       Regions specified must either match the Regions specified in the parameter
       UnifiedConsoleTargetRegions or must be a subset of Regions specified in
       the parameter UnifiedConsoleTargetRegions.
-    Default: ca-central-1
+    Default: us-east-1,us-east-2,us-west-2
 
 Resources:
   #-------------------------------------------------
@@ -141,7 +188,7 @@ Resources:
           LocalDeploymentAdministrationRoleArn: !GetAtt QuickSetupAdministrationRole.Arn
           LocalDeploymentExecutionRoleName: !Ref QuickSetupExecutionRole
           Parameters:
-            DelegatedAccountId: !Ref DelegatedAccountId
+            DelegatedAccountId: !Ref DelegatedAdminAccountId
             HomeRegion: !Ref HomeRegion
             TargetOrganizationalUnits: !Ref UnifiedConsoleTargetOrganizationalUnits
             TargetRegions: !Ref UnifiedConsoleTargetRegions
@@ -162,7 +209,7 @@ Resources:
           LocalDeploymentAdministrationRoleArn: !GetAtt QuickSetupAdministrationRole.Arn
           LocalDeploymentExecutionRoleName: !Ref QuickSetupExecutionRole
           Parameters:
-            DelegatedAccountId: !Ref DelegatedAccountId
+            DelegatedAccountId: !Ref DelegatedAdminAccountId
             HomeRegion: !Ref HomeRegion
             IdentityProviderSetting: !Ref IdentityProviderSetting
             TargetOrganizationalUnits: !Ref JITNATargetOrganizationalUnits
