@@ -6,6 +6,10 @@ sidebar_position: 2
 
 The following section describes how to deploy just-in-time node access using CloudFormation in an AWS Organization. To deploy just-in-time node access, you must first enable just-in-time node access for your environment and then you can deploy just-in-time node access resources which include approval policies, session preferences, and notification configurations.
 
+:::info
+The Systems Manager unified console and just-in-time node access can also be enabled on a per account/Region basis by performing local deployments rather than by enabling the features within the delegated administrator account.
+:::
+
 ## Enable just-in-time node access
 
 1. In the AWS management account for your organization, specify a delegated administrator account for Systems Manager.
