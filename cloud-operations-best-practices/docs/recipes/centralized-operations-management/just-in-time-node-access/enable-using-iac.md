@@ -1,0 +1,60 @@
+---
+sidebar_position: 2
+---
+
+# Enable JITNA using Infrastructure-as-Code (IaC)
+
+The following section describes how to deploy just-in-time node access using CloudFormation in an AWS Organization. To deploy just-in-time node access, you must first enable just-in-time node access for your environment and then you can deploy just-in-time node access resources which include approval policies, session preferences, and notification configurations.
+
+:::info
+The Systems Manager unified console and just-in-time node access can also be enabled on a per account/Region basis by performing local deployments rather than by enabling the features within the delegated administrator account.
+:::
+
+## Enable just-in-time node access
+
+1. In the AWS management account for your organization, specify a delegated administrator account for Systems Manager.
+1. Deploy the [Systems Manager unified console](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-setting-up-organizations.html).
+1. Deploy [Just-in-time node access](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-just-in-time-node-access.html).
+
+Below is an example architecture diagram for deploying Quick Setup configuration managers for the unified console and just-in-time node access.
+
+![Example architecture diagram for deploying Quick Setup configuration managers for the unified console and just-in-time node access](/img/recipes/centralized-operations-management/just-in-time-node-access/jitna-organization.png "Just-in-time node access architecture diagram")
+
+1. Create a CloudFormation stack within the delegated administrator account for Systems Manager.
+1. The CloudFormation stack creates Quick Setup configuration managers.
+1. The Quick Setup configuration manager for the unified console is deployed to all OUs in the organization, A, B, and C.
+1. The Quick Setup configuration manager for JITNA is deployed into OUs A and B.
+
+:::info
+Just-in-time node access can either be enabled across your AWS Organization or for specific Organizational Units (OUs) within the organization. Deployable Regions for just-in-time node access include all Regions you have enabled for the Systems Manager unified console. You cannot enable JITNA for Regions where the unified console is not enabled.
+:::
+
+### Deploy Quick Setup configuration managers
+
+To enable just-in-time node access using infrastructure-as-code (IaC), you need to:
+
+1. Deploy Quick Setup IAM service roles.
+    :::info
+    For more information on IAM service roles for Quick Setup, see [Manual onboarding for working with Quick Setup API programatically](https://docs.aws.amazon.com/systems-manager/latest/userguide/quick-setup-getting-started.html#quick-setup-api-manual-onboarding).
+    :::
+1. Deploy two [Quick Setup Configuration Managers](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ssmquicksetup-configurationmanager.html):
+    1. Systems Manager unified console.
+    1. Systems Manager just-in-time-node access.
+
+The following example CloudFormation template includes creating the two required Quick Setup IAM service roles and deploys the two Quick Setup configuration managers for the Systems Manager unified console and JITNA.
+
+#### Sample CloudFormation template
+
+[Just-in-time node access sample CFN template](/cloud-operations-best-practices/static/cfn-templates/just-in-time-node-access/just-in-time-quick-setup-cfn-template.yaml)
+
+##### CloudFormation template parameters
+
+| Parameter Name | Description | Example value |
+| -------------- | ----------- | ------------- |
+| `DelegatedAdminAccountId` | AWS Account ID for the Systems Manager delegated administrator account. | 123456789012 |
+| `HomeRegion` | AWS Region where the Systems Manager unified console is deployed. | us-east-1 |
+| `IdentityProviderSetting` | Specifies identity provider IAM Identity Access Management (IAM) or Single Sign-On (SSO) used for determining who is the current access control template approver. | IAM |
+| `JITNATargetOrganizationalUnits` | Comma-separated list of AWS Organization Unit IDs where just-in-time node access is set up. | ou-a1b2-abcd1234,ou-a1b2-efgh1234,ou-a1b2-hijk1234 |
+| `JITNATargetRegions` | The Regions where you want to enable just-in-time node access. The Regions specified must either match the Regions specified in the parameter `UnifiedConsoleTargetRegions` or must be a subset of Regions specified in the parameter `UnifiedConsoleTargetRegions`. | us-east-1,us-east-2,us-west-2 |
+| `UnifiedConsoleRootOrganizationUnitID` | The root AWS Organization unit ID. | r-abcd |
+| `UnifiedConsoleTargetRegions` | Comma-separated list of AWS Regions where the Systems Manager unified console is set up. Data is aggregated from these Regions and replicated to your home Region. | us-east-1,us-east-2,us-west-2 |
