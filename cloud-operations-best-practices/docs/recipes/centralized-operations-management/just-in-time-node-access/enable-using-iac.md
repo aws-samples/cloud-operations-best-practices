@@ -45,7 +45,7 @@ The following example CloudFormation template includes creating the two required
 
 #### Sample CloudFormation template
 
-[Just-in-time node access sample CFN template](/cloud-operations-best-practices/static/cfn-templates/just-in-time-node-access/just-in-time-quick-setup-cfn-template.yaml)
+[Just-in-time node access sample CFN template](https://github.com/aws-samples/cloud-operations-best-practices/blob/main/cloud-operations-best-practices/static/cfn-templates/just-in-time-node-access/just-in-time-quick-setup-cfn-template.yaml)
 
 ##### CloudFormation template parameters
 
