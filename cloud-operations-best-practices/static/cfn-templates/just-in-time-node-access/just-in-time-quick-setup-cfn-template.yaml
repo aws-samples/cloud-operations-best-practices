@@ -26,7 +26,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: CloudFormation template to deploy a Quick Setup configuration manager for
   the Systems Manager unified console and just-in-time node access.
-
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -70,7 +69,7 @@ Metadata:
         default: "Just-in-time node access target organizational units"
       JITNATargetRegions:
         default: "Just-in-time node access target Regions"
-
+      
 Parameters:
   DelegatedAdminAccountId:
     Type: String

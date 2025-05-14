@@ -18,7 +18,7 @@
 
 #------------------------------------------------------------------------------
 #
-# Template: just-in-time-documents.yaml
+# Template: just-in-time-cfn-approval-policies.yaml
 # Purpose: CloudFormation template to deploy approval policies and Session Preferences document for just-in-time node access.
 #
 #------------------------------------------------------------------------------
@@ -72,7 +72,7 @@ Resources:
             MinRequiredApprovals: 1
             EnhancedApprovals:
               Approvers:
-              - approver: ec4df598-7071-70a6-0de4-f06c8908bac5
+              - approver: ec4df598-7071-70a6-0de4-12345example
                 type: SSOGroup
       DocumentFormat: YAML
       DocumentType: ManualApprovalPolicy
@@ -102,7 +102,7 @@ Resources:
             MinRequiredApprovals: 1
             EnhancedApprovals:
               Approvers:
-              - approver: ec4df598-7071-70a6-0de4-f06c8908bac5
+              - approver: ec4df598-7071-70a6-0de4-12345example
                 type: SSOGroup
       DocumentFormat: YAML
       DocumentType: ManualApprovalPolicy
