@@ -39,6 +39,9 @@ Metadata:
         Parameters:
           - UnifiedConsoleRootOrganizationUnitID
           - UnifiedConsoleTargetRegions
+          - AgentUpdateSchedule
+          - EnableDHMCSchedule
+          - InventoryCollectionSchedule
       - Label:
           default: "Just-in-time node access parameters"
         Parameters:
@@ -56,11 +59,17 @@ Metadata:
         default: "Unified console target organizational units"
       UnifiedConsoleTargetRegions:
         default: "Unified console target Regions"
+      AgentUpdateSchedule:
+        default: "Agent update schedule"
+      EnableDHMCSchedule:
+        default: "Enable DHMC schedule"
+      InventoryCollectionSchedule:
+        default: "Inventory collection schedule"
       JITNATargetOrganizationalUnits:
         default: "Just-in-time node access target organizational units"
       JITNATargetRegions:
         default: "Just-in-time node access target Regions"
-      
+
 Parameters:
   DelegatedAdminAccountId:
     Type: String
@@ -76,12 +85,18 @@ Parameters:
       - us-east-2
       - us-west-1
       - us-west-2
+      - ca-central-1
+      - sa-east-1
       - eu-central-1
+      - eu-north-1
       - eu-west-1
       - eu-west-2
+      - eu-west-3
+      - ap-south-1
       - ap-northeast-1
+      - ap-northeast-2
+      - ap-southeast-1
       - ap-southeast-2
-      - ca-central-1
   IdentityProviderSetting:
     Type: String
     Description: (Optional) Specifies identity provider IAM Identity Access
@@ -102,6 +117,21 @@ Parameters:
       unified console is set up. Data is aggregated from these Regions and
       replicated to your home Region.
     Default: us-east-1,us-east-2,us-west-2
+  AgentUpdateSchedule:
+    Type: String
+    Default: rate(14 days)
+    Description: (Optional) The interval at which the agent update association runs. To opt-out, enter none.
+    AllowedPattern: ((?:rate\(\b([1-9]|[12][0-9]|3[01])\b (?:day|days)\))|none)
+  EnableDHMCSchedule:
+    Type: String
+    Default: rate(1 day)
+    Description: (Optional) The interval at which the DHMC association runs. To opt-out, enter none.
+    AllowedPattern: ((?:rate\(\b([1-9]|[12][0-9]|3[01])\b (?:day|days)\))|none)
+  InventoryCollectionSchedule:
+    Type: String
+    Default: rate(24 hours)
+    Description: (Optional) The interval at which inventory collection runs. To opt-out, enter none.
+    #AllowedPattern: (?:rate\\((?:[1-9]\\d*)\\s(?:day|days|hour|hours|minute|minutes)\\)|none)
   JITNATargetOrganizationalUnits:
     Type: String
     Description: Comma-separated list of AWS Organization Unit IDs where just-in-time node access is set up.
@@ -188,6 +218,9 @@ Resources:
           LocalDeploymentAdministrationRoleArn: !GetAtt QuickSetupAdministrationRole.Arn
           LocalDeploymentExecutionRoleName: !Ref QuickSetupExecutionRole
           Parameters:
+            AgentUpdateSchedule: !Ref AgentUpdateSchedule
+            EnableDHMCSchedule: !Ref EnableDHMCSchedule
+            InventoryCollectionSchedule: !Ref InventoryCollectionSchedule
             DelegatedAccountId: !Ref DelegatedAdminAccountId
             HomeRegion: !Ref HomeRegion
             TargetOrganizationalUnits: !Ref UnifiedConsoleRootOrganizationUnitID
