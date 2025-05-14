@@ -69,7 +69,7 @@ Metadata:
         default: "Just-in-time node access target organizational units"
       JITNATargetRegions:
         default: "Just-in-time node access target Regions"
-      
+
 Parameters:
   DelegatedAdminAccountId:
     Type: String
