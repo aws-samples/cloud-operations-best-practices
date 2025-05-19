@@ -1,5 +1,5 @@
 ---
-sidebar_position: 2
+sidebar_position: 4
 ---
 # AWS Config Cost Optimization
 
@@ -21,8 +21,8 @@ For current details on AWS Config pricing, [please refer to this link](https://a
 
 While the above are the primary pricing components, other factors can influence the total cost of using AWS Config:
 
-1. [AWS Lambda](https://aws.amazon.com/lambda/pricing/)Costs: If you're using custom rules implemented via Lambda functions, standard Lambda pricing applies.
-2. [Amazon S3](https://aws.amazon.com/s3/pricing/) Storage: Costs are incurred for storing configuration snapshots and history files in S3.
+1. [AWS Lambda](https://aws.amazon.com/lambda/pricing/) costs: If you're using custom rules implemented via Lambda functions, standard Lambda pricing applies.
+2. [Amazon S3](https://aws.amazon.com/s3/pricing/) storage: Costs are incurred for storing configuration snapshots and history files in S3.
 3. Data Transfer: Charges may apply for data transfer between AWS services or regions.
 
 
@@ -35,9 +35,9 @@ While the above are the primary pricing components, other factors can influence 
 
 ![AWS Config Cost Visualization](/img/guides/config/configcost.png)
 
-[Amazon CloudWatch’s](https://aws.amazon.com/cloudwatch/) "ConfigurationItemsRecorded" metric helps identify resource types generating the most configuration items.  Please refer to blog on how to[analyze AWS Config Resource Changes Using CloudWatch Metrics](http://(https//aws.amazon.com/blogs/mt/analyzing-aws-config-resource-changes-using-cloudwatch-metrics/).  For detailed analysis, [Amazon Athena](https://aws.amazon.com/athena/) can be used to query [Cost and Usage Reports](https://aws.amazon.com/aws-cost-management/aws-cost-and-usage-reporting/) with [AWS CloudTrail](https://aws.amazon.com/cloudtrail/) and [CloudTrail Lake](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-lake.html) to help estimate config recorder costs and track frequently evaluated rules. Please refer to blog on how to [use Athena to Analyze AWS Config Data](https://aws.amazon.com/blogs/mt/use-amazon-athena-and-aws-cloudtrail-to-estimate-billing-for-aws-config-rule-evaluations/)
+[Amazon CloudWatch's](https://aws.amazon.com/cloudwatch/) "ConfigurationItemsRecorded" metric helps identify resource types generating the most configuration items.  Please refer to blog on [how to analyze AWS Config Resource Changes Using CloudWatch Metrics](https//aws.amazon.com/blogs/mt/analyzing-aws-config-resource-changes-using-cloudwatch-metrics/).  For detailed analysis, [Amazon Athena](https://aws.amazon.com/athena/) can be used to query [Cost and Usage Reports](https://aws.amazon.com/aws-cost-management/aws-cost-and-usage-reporting/) with [AWS CloudTrail](https://aws.amazon.com/cloudtrail/) and [CloudTrail Lake](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-lake.html) to help estimate config recorder costs and track frequently evaluated rules. Please refer to blog on how to [use Athena to Analyze AWS Config Data](https://aws.amazon.com/blogs/mt/use-amazon-athena-and-aws-cloudtrail-to-estimate-billing-for-aws-config-rule-evaluations/)
 
-For cost alerts,  implement proactive cost management through [AWS Budgets](https://aws.amazon.com/aws-cost-management/aws-budgets/) when costs exceed predefined thresholds.  Also, [AWS Cost Anomaly Detection](https://aws.amazon.com/aws-cost-management/aws-cost-anomaly-detection/) service provides continuous monitoring for unusual spending patterns, making it easier to identify and address cost spikes quickly. You can also create[CloudWatch billing alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/monitor_estimated_charges_with_cloudwatch.html) that notify you when your estimated charges exceed a defined threshold.  
+For cost alerts,  implement proactive cost management through [AWS Budgets](https://aws.amazon.com/aws-cost-management/aws-budgets/) when costs exceed predefined thresholds.  Also, [AWS Cost Anomaly Detection](https://aws.amazon.com/aws-cost-management/aws-cost-anomaly-detection/) service provides continuous monitoring for unusual spending patterns, making it easier to identify and address cost spikes quickly. You can also create [CloudWatch billing alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/monitor_estimated_charges_with_cloudwatch.html) that notify you when your estimated charges exceed a defined threshold.  
 
 #### Choosing Between Continuous and Periodic Recording
 
@@ -101,7 +101,7 @@ Indirect Relationships:
 
 You can learn more about what resources support indirect relationships [in this link](https://docs.aws.amazon.com/config/latest/developerguide/faq.html).
 
-To opt out of indirect relationships,  we recommend the TAM fill out the initial request for the customer via this [SIM template](https://t.corp.amazon.com/D64085914/overview.).
+To opt out of indirect relationships,  we recommend you reach out to your [Technical Account Manager](https://aws.amazon.com/premiumsupport/plans/enterprise/).
 
 #### Rule Management and Evaluation Considerations 
 
@@ -122,7 +122,7 @@ For custom rule implementation, using [CloudFormation Guard](https://docs.aws.am
 
 #### Conformance Pack and Rule Deduplication 
 
-Regular auditing of rules and [conformance packs](https://docs.aws.amazon.com/config/latest/developerguide/conformance-packs.html) is essential to eliminate redundancy.  For instance, if multiple conformance packs include the same rule (such as CloudTrail enablement checks) that's already being evaluated by [AWS Security Hub](https://aws.amazon.com/security-hub/), consider removing the duplicate rules to avoid unnecessary evaluation costs. Review and consolidate overlapping rules across different compliance standards to maintain effectiveness while optimizing costs. Please follow t[his blog to discover duplicate AWS Config rules](https://aws.amazon.com/blogs/security/discover-duplicate-aws-config-rules-for-streamlined-compliance/).
+Regular auditing of rules and [conformance packs](https://docs.aws.amazon.com/config/latest/developerguide/conformance-packs.html) is essential to eliminate redundancy.  For instance, if multiple conformance packs include the same rule (such as CloudTrail enablement checks) that's already being evaluated by [AWS Security Hub](https://aws.amazon.com/security-hub/), consider removing the duplicate rules to avoid unnecessary evaluation costs. Review and consolidate overlapping rules across different compliance standards to maintain effectiveness while optimizing costs. Please follow [this blog to discover duplicate AWS Config rules](https://aws.amazon.com/blogs/security/discover-duplicate-aws-config-rules-for-streamlined-compliance/).
 
 #### Optimizing Global Resource Recording in AWS Config
 
