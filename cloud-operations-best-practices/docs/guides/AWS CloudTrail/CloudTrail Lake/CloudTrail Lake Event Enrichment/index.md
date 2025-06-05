@@ -65,8 +65,8 @@ FROM $EDS_ID
 WHERE eventContext IS NOT NULL 
 and eventSource = 's3.amazonaws.com'
 and eventname in ('DeleteObject', 'PutObject')
-AND eventtime >= '2025-05-30 00:00:00'
-AND eventtime <= '2025-05-30 23:59:59'
+AND eventtime >= '2025-06-05 00:00:00'
+AND eventtime <= '2025-06-05 23:59:59'
 ```
 
 #### **Resource Tags for Event Enrichment on Data Classification Tag**
@@ -81,8 +81,8 @@ WHERE eventContext IS NOT NULL
 and element_at(eventContext.tagContext.resourceTags[1].tags, 'DataClassification') = 'sensitive'
 and eventSource = 's3.amazonaws.com'
 and eventname in ('DeleteObject', 'PutObject')
-AND eventtime >= '2025-05-12 00:00:00'
-AND eventtime <= '2025-05-16 23:59:59'
+AND eventtime >= '2025-06-05 00:00:00'
+AND eventtime <= '2025-06-05 23:59:59'
 ```
 
 #### **Sample Query to create a Visualization Chart for Event Enrichment**
@@ -98,8 +98,8 @@ WHERE eventContext IS NOT NULL
 and element_at(eventContext.tagContext.resourceTags[1].tags, 'DataClassification') = 'sensitive'
 and eventSource = 's3.amazonaws.com'
 and eventname in ('DeleteObject', 'PutObject')
-AND eventtime >= '2025-05-12 00:00:00'
-AND eventtime <= '2025-05-16 23:59:59'
+AND eventtime >= '2025-06-05 00:00:00'
+AND eventtime <= '2025-06-05 23:59:59'
 Group BY eventName,
 substr(userIdentity.arn, strpos(userIdentity.arn, '/') +1),
 element_at(eventContext.tagContext.resourceTags[1].tags, 'DataClassification'),
