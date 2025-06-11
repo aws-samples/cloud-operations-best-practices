@@ -95,7 +95,7 @@ import TabItem from '@theme/TabItem';
     ]}>
 <TabItem value="cloudformation">
 
-If you use CloudFormation to launch instances using AMIs that do not have SSM agent pre-installed, you can leverage the Userdata property to install SSM agent.
+If you use CloudFormation to launch instances using AMIs that do not have SSM agent pre-installed, you can leverage the `UserData` property to install SSM agent.
 
 ```yaml
   # EC2 Instance
@@ -168,14 +168,14 @@ output "instance_id" {
 
 #### EC2 Console/API/SDK
 
-When launching the EC2 Instance using EC2 console or any SDK, add user data with SSM Agent installation commands to an Amazon EC2 instance before you launch the instance.
+When launching the EC2 instance using EC2 console or any SDK, add user data with SSM Agent installation commands to an Amazon EC2 instance before you launch the instance.
 
 * Refer to steps mentioned in this article for Linux: [How do I install SSM Agent on an Amazon EC2 Linux instance at launch?](https://repost.aws/knowledge-center/install-ssm-agent-ec2-linux)
 * Refer to steps mentioned in this article for Windows: [How do I install AWS Systems Manager Agent (SSM Agent) on an Amazon EC2 Windows instance at launch?](https://repost.aws/knowledge-center/ssm-agent-windows-ec2)
 
-#### Application Migration service(MGN)
+#### Application Migration Service (MGN)
 
-If your servers are migrated and launched using Application Migration service, use the Post-launch settings to Install SSM Agent. Refer to the steps outlined [here](https://docs.aws.amazon.com/mgn/latest/ug/post-launch-settings.html#post-launch-settings-activation).
+If your servers are migrated and launched using Application Migration Service, use the **post-launch** settings to install SSM Agent. Refer to the steps outlined [here](https://docs.aws.amazon.com/mgn/latest/ug/post-launch-settings.html#post-launch-settings-activation).
 
 #### Amazon EKS
 
@@ -371,7 +371,7 @@ When done programmatically using the `ModifyInstanceAttribute` API, this script 
 
 #### Group Policy (for Windows)
 
-Installing SSM Agent via Group Policy (Windows) While Group Policy traditionally supports .msi packages, the AWS Systems Manager (SSM) Agent comes as an .exe file. To overcome this limitation, we'll use a combination of Group Policy and Scheduled Tasks to deploy the SSM Agent across your Windows environment.
+While Group Policy traditionally supports .msi packages, the AWS Systems Manager (SSM) Agent comes as an .exe file. To overcome this limitation, we'll use a combination of Group Policy and Scheduled Tasks to deploy the SSM Agent across your Windows environment.
 
 1. Create (or modify an existing) GPO in the appropriate hierarchy/OU in Active Directory. Edit the policy to utilize the computer scheduled task script configuration.
 
@@ -395,7 +395,7 @@ Installing SSM Agent via Group Policy (Windows) While Group Policy traditionally
 
 7. Once this is complete, any linked computers should get the installer pushed to them when the GP policy updates or when using `gpudate /force` from the command prompt to force that action.
 
-* [Automate Registering Windows Managed Nodes in AWS Systems Manager](https://github.com/aws-samples/sample-ssm-automate-windows-hybrid-install)
+For more information, see [Automate Registering Windows Managed Nodes in AWS Systems Manager](https://github.com/aws-samples/sample-ssm-automate-windows-hybrid-install).
 
 #### SSH (for Linux)
 
