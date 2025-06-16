@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 ---
+
 # Best Practices for CloudTrail Lake event enrichment
 
 CloudTrail event enrichment allows you to enhance management and data events by adding resource tag keys, and IAM global condition keys, including principal tag keys,  when creating or updating an event data store. This enrichment enables better categorization, searching, and analysis of CloudTrail events based on business context, such as cost allocation, financial management, operations, and data security requirements. The enriched events include an eventContext field that provides contextual information for API actions, which you can analyze by running queries in CloudTrail Lake or through federation with Amazon Athena. This feature helps organizations better understand and track their AWS resource usage and security posture by incorporating additional metadata about resources~~, principals~~, and authorization conditions into their event logs.
@@ -107,3 +108,8 @@ eventContext.tagContext.resourceTags[1].arn,
 element_at(requestParameters, 'key')
 ```
 
+### Cloud Operation Show: Tag It & Track It: AWS CloudTrail Event Enrichment and Expansions Explained
+
+<div align="center">
+<iframe width="560" height="315" src="https://www.youtube.com/embed/IELtInifymY?si=uupyo9_wx0Kcx1Vw" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+</div>
