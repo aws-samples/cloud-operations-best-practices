@@ -3,6 +3,7 @@
 // (when paired with `@ts-check`).
 // There are various equivalent ways to declare your Docusaurus config.
 // See: https://docusaurus.io/docs/api/docusaurus-config
+// Additional language support : https://docusaurus.io/docs/markdown-features/code-blocks#supported-languages
 
 import {themes as prismThemes} from 'prism-react-renderer';
 
@@ -117,7 +118,7 @@ const config = {
           defaultMode: 'light',
           disableSwitch: false,
           respectPrefersColorScheme: true,
-      },  
+      },
       footer: {
         style: 'dark',
         copyright: `Built with ❤️ at AWS. <br/> © ${new Date().getFullYear()}.  Amazon.com, Inc. or its affiliates. All Rights Reserved.`,
@@ -125,6 +126,7 @@ const config = {
       prism: {
         theme: prismThemes.github,
         darkTheme: prismThemes.dracula,
+        additionalLanguages: ['powershell','puppet','ruby'],
       },
     }),
 };
