@@ -12,7 +12,7 @@ people:
 | Authors             | Authors                     | Authors           | Authors            |
 | ------------------- | --------------------------- | ----------------- | ------------------ |
 | Isaiah Salinas      | Nereida Woo                 | Erik Weber        | Brad Gilomen       |
-| Justin Thomas | Cheng-Lun Chen  |  |  |
+| Justin Thomas       | Cheng-Lun Chen              |                   |                    |
 
 Note that all recipes published on this site are available via the
 [MIT-0][mit0] license, a modification to the usual MIT license
