@@ -69,7 +69,7 @@ const config = {
           },
           {
             type: 'doc',
-            docId: 'tools/index',
+            docId: 'solutions/index',
             position: 'left',
             label: 'Solutions',
           },
