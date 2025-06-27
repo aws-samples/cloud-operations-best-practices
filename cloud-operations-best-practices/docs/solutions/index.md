@@ -6,4 +6,4 @@ sidebar_position: 3
 
 ## Centralized Operations Management
 
-[Patching managed nodes using AWS Systems Manager and tagging](/cloud-operations-best-practices/docs/tools/centralized-operations-management/patch-nodes-using-tags)
+[Patching managed nodes using AWS Systems Manager and tagging](/cloud-operations-best-practices/docs/solutions/centralized-operations-management/patch-nodes-using-tags)
