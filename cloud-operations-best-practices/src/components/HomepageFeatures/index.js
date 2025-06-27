@@ -23,7 +23,7 @@ const FeatureList = [
        Streamline your AWS cloud operations with purpose-built solutions.
       </>
     ),
-    link: '/docs/tools/',
+    link: '/docs/solutions/',
   },
   {
     title: 'Recipes',
