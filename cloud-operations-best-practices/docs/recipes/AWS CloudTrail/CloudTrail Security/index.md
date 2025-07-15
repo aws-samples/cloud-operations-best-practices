@@ -1,17 +1,13 @@
 ---
 sidebar_position: 2
 ---
-# AWS CloudTrail Security
+# Security Incident Response and Forensic Analysis
 
 AWS CloudTrail is a critical service for monitoring and logging account activity across your AWS infrastructure. It provides detailed records of API calls, user actions, and service events that are essential for security forensics, incident response, and compliance auditing.
-
-## CloudTrail Security Tool
 
 This section provides comprehensive guidance on leveraging CloudTrail for security incident response and forensic analysis. You'll learn how to understand critical event fields, implement best practices for security monitoring, and access curated resources to strengthen your security posture.
 
 ### What You'll Learn
-
-
 
 **[Understanding CloudTrail Event Fields](./event-fields.mdx)**
 - Critical CloudTrail event fields and their security significance
