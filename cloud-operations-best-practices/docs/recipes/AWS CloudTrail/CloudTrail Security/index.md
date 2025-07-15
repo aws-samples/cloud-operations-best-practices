@@ -24,7 +24,7 @@ This section provides comprehensive guidance on leveraging CloudTrail for securi
 
 **[Additional Security Resources](./additional-resources.mdx)**
 - Curated AWS blog posts for incident investigation, monitoring, and automation
-- Hands-on AWS CIRT security workshops for simulating real-world attack scenarios
+- Hands-on CloudTrail security workshops for simulating real-world attack scenarios
 - Tools and scripts for automating CloudTrail analysis and incident response
 
 ### Key Benefits
