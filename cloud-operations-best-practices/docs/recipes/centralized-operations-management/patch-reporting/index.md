@@ -29,8 +29,9 @@ Before beginning deployment, ensure you have:
 
 * AWS Organizations setup: A properly configured AWS Organization with a management account and member accounts.
 * Managed nodes configured: Amazon Elastic Compute Cloud (EC2) instances, AWS Internet of Things (IoT) Greengrass core devices, on-premises servers, edge devices, and VMs must be Systems Manager managed nodes to perform patching operations and report patch compliance.
-* Patch operations implemented: At minimum, a patch scan operation must be configured and executed at least once. Without this, there will be no compliance data to report on. For more information on different types of patching and methods to implement patching, see the [Patch Management Best Practices guide](/cloud-operations-best-practices/docs/guides/centralized-operations-management/patch-management) and the section [Different types of patching](/cloud-operations-best-practices/docs/guides/centralized-operations-management/patch-management#different-types-of-patching).
+* Patch operations implemented: At minimum, a patch scan operation must be configured and executed at least once. Without this, there will be no compliance data to report on. For more information on different types of patching and how to implement patching, see the [Patch Management Best Practices guide](/cloud-operations-best-practices/docs/guides/centralized-operations-management/patch-management) and the section [Different types of patching](/cloud-operations-best-practices/docs/guides/centralized-operations-management/patch-management#different-types-of-patching).
 * IAM permissions: Appropriate permissions to deploy CloudFormation templates and create the required resources in both the central reporting account and member accounts.
+* Amazon QuickSight: In order to visualize patch compliance information using QuickSight, you must sign up for QuickSight and ensure QuickSight has permissions to the S3 buckets created. More information is provided in [Prerequisites to complete before deploying the CloudFormation template for QuickSight](#prerequisites-to-complete-before-deploying-the-cloudformation-template-for-quicksight).
 
 ## Considerations
 
@@ -44,7 +45,7 @@ Alternatives to using the custom resource to create the resource data sync:
 
 1. Use the standard resource data sync which is supported by CloudFormation.
     1. To accomplish this, you must create and use a bucket policy which grants permissions based in AWS account IDs. For more information and an example S3 bucket policy, see [Before you begin](https://docs.aws.amazon.com/systems-manager/latest/userguide/inventory-create-resource-data-sync.html#datasync-before-you-begin).
-    1. Update the S3 bucket policy in the [Sample CloudFormation template for central reporting](#sample-cloudformation-template-for-central-reporting) to use the new policy which lists out the AWS account IDs.
+    1. Update the S3 bucket policy in the [Sample CloudFormation template for central reporting using Athena](#sample-cloudformation-template-for-central-reporting-using-athena) to use the new policy which lists out the AWS account IDs.
     1. Use CloudFormation StackSets to deploy the `AWS::SSM::ResourceDataSync` resource. For an example CloudFormation resource snippet, see [Create a SyncToDestination resource data sync](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-ssm-resourcedatasync.html#aws-resource-ssm-resourcedatasync--examples--Create_a_SyncToDestination_resource_data_sync).
 1. Use an alternative method to create the organization resource data sync, for example, scripting via the AWS CLI or other SDKs.
 
@@ -110,13 +111,30 @@ As noted in the diagram above, you can register hybrid managed nodes for patchin
 
 ## Deployment steps
 
-### Central reporting account deployment
+### Deployment checklist
 
-#### Sample CloudFormation template for central reporting
+Below you can find a checklist for the deployment steps included in this recipe.
+
+#### Central reporting account tasks
+
+* [ ] Deploy CloudFormation stack for Athena resources
+* [ ] Note S3 bucket names from stack outputs
+* [ ] Configure QuickSight permissions for S3 buckets
+* [ ] Deploy CloudFormation stack for QuickSight visualization
+* [ ] Verify access to QuickSight analysis
+
+#### Member account tasks (via StackSets)
+
+* [ ] Deploy organization resource data sync CloudFormation StackSet
+* [ ] Verify resource data syncs are created in member accounts
+
+### Phase 1: Central account setup
+
+#### Sample CloudFormation template for central reporting using Athena
 
 Below you can find details about the resources created by the CloudFormation template and their purpose.
 
-[Sample CloudFormation template for central reporting](https://github.com/aws-samples/cloud-operations-best-practices/blob/main/cloud-operations-best-practices/static/cfn-templates/patch-reporting/patch-reporting.yaml)
+[Sample CloudFormation template for central reporting using Athena](https://github.com/aws-samples/cloud-operations-best-practices/blob/main/cloud-operations-best-practices/static/cfn-templates/patch-reporting/patch-reporting.yaml)
 
 | Resource Name | Purpose |
 | -------- | ------ |
@@ -149,9 +167,9 @@ Below you can find details about the resources created by the CloudFormation tem
 | S3BucketCleanup | Lambda function to clean up S3 buckets |
 | S3Cleanup | Custom resource to clean up S3 buckets |
 
-#### Deploy a CloudFormation stack in the central reporting account
+#### Deploy a CloudFormation stack for Athena in the central reporting account
 
-1. Download the [Sample CloudFormation template for central reporting](https://github.com/aws-samples/cloud-operations-best-practices/blob/main/cloud-operations-best-practices/static/cfn-templates/patch-reporting/patch-reporting.yaml) to your local machine.
+1. Download the [Sample CloudFormation template for central reporting using Athena](https://github.com/aws-samples/cloud-operations-best-practices/blob/main/cloud-operations-best-practices/static/cfn-templates/patch-reporting/patch-reporting.yaml) to your local machine.
 1. In the central reporting account and Region, navigate to the [AWS CloudFormation console](https://console.aws.amazon.com/cloudformation/home).
 1. In left navigation pane, choose **Stacks**, and then choose **Create stack**.
 1. From the dropdown list, choose **With new resources (standard)**.
@@ -162,13 +180,67 @@ Below you can find details about the resources created by the CloudFormation tem
     :::tip
     For more information on how to retrieve the AWS Organization ID, see [Viewing details of an organization from the management account](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_view_org.html).
     :::
+    1. For **Enable Glue Crawler Schedule**, choose to enable or disbale scheduled execution of the Glue crawler.
+    1. For **Glue Crawler Schedule (cron)**, enter a cron schedule expression for the Glue crawler.
+    1. For **Enable KMS permissions for QuickSight service role**, choose to enable or disable KMS permissions for the QuickSight IAM service role. **Note**: If you do not grant KMS permissions, you will not be able to visualize patch compliance data using QuickSight.
     1. Choose **Next**.
 1. On the **Configure stack options** page, add any required tags, select **I acknowledge that AWS CloudFormation might create IAM resources with custom names**, and then choose **Next**.
 1. On the **Review and create** page, review all the information and then choose **Submit** to create your stack.
 
-After the page is refreshed, the status of your stack should be `CREATE_IN_PROGRESS`. When the status changes to `CREATE_COMPLETE`, you can then deploy the resource data sync in your member account(s)/Region(s).
+After the page is refreshed, the status of your stack should be `CREATE_IN_PROGRESS`. When the status changes to `CREATE_COMPLETE`, you can then deploy the QuickSight visualization.
 
-### Member account(s)/Region(s) deployment
+:::tip
+Take note of the names of the Amazon S3 buckets for **AthenaQueryResultsBucket** and **ResourceDataSyncBucketName** which can be found in the **Outputs** tab of the CloudFormation stack. You will need these two values in the next section to deploy QuickSight.
+:::
+
+#### Sample CloudFormation template for Amazon QuickSight visualization
+
+Below you can find details about the resources created by the CloudFormation template and their purpose.
+
+[Sample CloudFormation template for Amazon QuickSight visualization](https://github.com/aws-samples/cloud-operations-best-practices/blob/main/cloud-operations-best-practices/static/cfn-templates/patch-reporting/quicksight.yaml)
+
+| Resource Name | Purpose |
+| -------- | ------ |
+| SSMDataSyncSource | QuickSight data source pointing to the Athena workgroup, patch-workgroup. |
+| ApplicationDataSet | QuickSight dataset for the application metadata |
+| ComplianceItemDataSet | QuickSight dataset for the compliance item metadata |
+| ComplianceSummaryDataSet | QuickSight dataset for the compliance summary metadata |
+| InstanceDetailedInformationDataSet | QuickSight dataset for the instance detailed information metadata |
+| InstanceInformationDataSet | QuickSight dataset for the instance information metadata |
+| TagDataSet | QuickSight dataset for the tag metadata |
+| JoinedDataSet | QuickSight dataset which joins aws_instanceinformation, aws_compliancesummary, aws_tag |
+| ManagedNodeAnalysis | QuickSight analysis dashboard |
+
+:::tip
+The sample CloudFormation template uses the `DIRECT_QUERY` method which allows near real-time querying of the data source. An alternative is to use SPICE to cache the data in QuickSight. If you use SPICE, the sample template also includes example refresh schedules on lines 551-647. For more information on which mode to use, see [Best practices for Amazon QuickSight SPICE and direct query mode](https://aws.amazon.com/blogs/business-intelligence/best-practices-for-amazon-quicksight-spice-and-direct-query-mode/)
+:::
+
+#### Prerequisites to complete before deploying the CloudFormation template for QuickSight
+
+In order for QuickSight to access the patch compliance and inventory metadata, you must grant access to QuickSight for the S3 buckets created in [Deploy a CloudFormation stack for Athena in the central reporting account](#deploy-a-cloudformation-stack-for-athena-in-the-central-reporting-account): `ssm-res-sync-athena-query-results-us-east-1-$AccountId` and `ssm-resource-sync-us-east-1-$AccountId`.
+
+![QuickSight permissions to S3 buckets](/img/recipes/central-reporting/quicksight-athena-resources.png "QuickSight permissions to S3 buckets")
+
+For more information on how to grant access, see[I can't connect to Amazon S3](https://docs.aws.amazon.com/quicksight/latest/user/troubleshoot-connect-S3.html).
+
+#### Deploy a CloudFormation stack for QuickSight in the central reporting account
+
+1. Download the [Sample CloudFormation template for Amazon QuickSight visualization](https://github.com/aws-samples/cloud-operations-best-practices/blob/main/cloud-operations-best-practices/static/cfn-templates/patch-reporting/quicksight.yaml) to your local machine.
+1. In the central reporting account and Region, navigate to the [AWS CloudFormation console](https://console.aws.amazon.com/cloudformation/home).
+1. In left navigation pane, choose **Stacks**, and then choose **Create stack**.
+1. From the dropdown list, choose **With new resources (standard)**.
+1. On the **Create stack** page, select **Upload a template file**, select **Choose file**, choose the `quicksight.yaml` file, and then choose **Next**.
+1. On the **Specify stack details** page, perform the following steps:
+    1. For **Stack name**, enter a descriptive name, such as `quicksight`.
+    1. For **QuickSightUser**, enter the name of the QuickSight user to be granted permissions to the QuickSight data sources and analysis dashboard.
+    1. For **Workgroup**, leave the default value `patch-workgroup`.
+    1. Choose **Next**.
+1. On the **Configure stack options** page, add any required tags, and then choose **Next**.
+1. On the **Review and create** page, review all the information and then choose **Submit** to create your stack.
+
+After the page is refreshed, the status of your stack should be `CREATE_IN_PROGRESS`. When the status changes to `CREATE_COMPLETE`, deploy resource data syncs into the member account(s)/region(s).
+
+### Phase 2: Member account configuration
 
 #### Sample CloudFormation template for organization resource data sync
 
@@ -217,17 +289,27 @@ The following walkthrough will use a delegated administrator account for CloudFo
 
 After the page is refreshed, you will be able to see your StackSet. The status will change to `SUCCEEDED` after it’s been created.
 
-## Query patch compliance
+## Phase 3: Verification and Testing
 
 ### Verify metadata in resource data sync S3 bucket
 
 In the central reporting account, navigate to the [Amazon S3 console](https://console.aws.amazon.com/s3/home) and select the S3 bucket created by CloudFormation named similarly to `ssm-resource-sync-${region}-${account-id}`. In the S3 bucket, select the bucket prefix you provided when [deploying the CloudFormation StackSet](#deploy-a-cloudformation-stackset).
 
-In the bucket, you can see the various data types that are synchronized by the resource data sync automatically. If you have previously configured Inventory metadata gathering and performed at least a patch scan operation, you should see 13 objects in the S3 bucket.
+In the bucket, you can see the various data types that are synchronized by the resource data sync automatically. If you have previously configured Inventory metadata gathering and performed at least a patch scan operation, you should see 13 folders in the S3 bucket. Each folder represents [metadata collected by Inventory](https://docs.aws.amazon.com/systems-manager/latest/userguide/inventory-schema.html).
 
-![S3 bucket objects for resource data sync metadata](/img/recipes/central-reporting/s3-bucket-objects.png "S3 bucket objects for resource data sync metadata")
+![S3 bucket folders for resource data sync metadata](/img/recipes/central-reporting/s3-bucket-objects.png "S3 bucket folders for resource data sync metadata")
 
 Within each of the data type prefixes, there will be a prefix for each account that is using resource data sync with this S3 bucket. This is followed by a prefix for each Region that is reporting inventory, and then a prefix for the resource type, which will generally be `ManagedInstanceInventory`. Then within that prefix, there will be a JSON file for each instance that reports Inventory data.
+
+### Verify access to QuickSight analysis
+
+Verify you have access to the QuickSight Analysis dashboard created by CloudFormation by navigating to the [QuickSight console](https://quicksight.aws.amazon.com/sn/start/analyses).
+
+If you do not see the analysis named **Managed Node Analysis CFN**, ensure you are logged into QuickSight as the same user you specified in the CloudFormation parameter `QuickSightUser`. You can verify the user you are logged into QuickSight with by selecting your profile in the upper-right corner.
+
+![QuickSight analysis created by CloudFormation](/img/recipes/central-reporting/quicksight-analysis.png "QuickSight analysis created by CloudFormation")
+
+## Query patch compliance
 
 ### Review the Glue crawler
 
@@ -355,15 +437,50 @@ LIMIT 20;
 </TabItem>
 </Tabs>
 
+## Visualize patch compliance using QuickSight
+
+The CloudFormation stack deployed in [Deploy a CloudFormation stack for QuickSight in the central reporting account](#deploy-a-cloudformation-stack-for-quicksight-in-the-central-reporting-account), created QuickSight datasets and an empty analysis dashboard so you can begin visualizing patch compliance and inventory metadata.
+
+To create QuickSight visuals, follow the procedures in the two topics listed below:
+
+1. [Part 1: Create QuickSight visuals based on metadata for managed nodes](https://catalog.workshops.aws/getting-started-with-com/en-US/advanced-workshops/organization-patch-reporting/create-quicksight-visuals-and-dashboard)
+1. [Part 2: Create AWS QuickSight Visuals for information on Patch Compliance](https://catalog.workshops.aws/getting-started-with-com/en-US/advanced-workshops/organization-patch-reporting/create-quicksight-visuals-for-patch-compliance)
+
+By following the two topics above, you can create a QuickSight dashboard with two sheets that look similar to this:
+
+<Tabs
+    defaultValue="instanceinfo"
+    values={[
+        {label: 'Instance information', value: 'instanceinfo'},
+        {label: 'Patch compliance', value: 'patchcompliance'},
+    ]}>
+<TabItem value="instanceinfo">
+
+![Example QuickSight dashboard for instance information](/img/recipes/central-reporting/example-instance-information-dashboard.png "Example QuickSight dashboard for instance information")
+
+</TabItem>
+
+<TabItem value="patchcompliance">
+
+![Example QuickSight dashboard for patch compliance](/img/recipes/central-reporting/example-patch-compliance-dashboard.png "Example QuickSight dashboard for patch compliance")
+
+</TabItem>
+</Tabs>
+
 ## Clean-up deployed resources
 
 :::warning
 The sample CloudFormation templates in this recipe delete the contents of the S3 buckets upon deleting the CloudFormation stack for the central reporting account.
 :::
 
-To clean-up the sample resources created in [Member account(s)/Region(s) deployment](#member-accountsregions-deployment), you must first [delete the stack instances in your StackSet](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stackinstances-delete.html) and then [delete the StackSet](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-delete.html).
+To clean-up the sample resources created in [Phase 2: Member account configuration](#phase-2-member-account-configuration), you must first [delete the stack instances in your StackSet](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stackinstances-delete.html) and then [delete the StackSet](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-delete.html).
 
-To clean-up the sample resources created in [Central reporting account deployment](#central-reporting-account-deployment), you can [delete the stack in the central reporting account](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-delete-stack.html).
+To clean-up the sample resources created in [Phase 1: Central account setup](#phase-1-central-account-setup), perform the following steps:
+
+1. Delete the resources in the stack, `quicksight`, deployed in the section [Deploy a CloudFormation stack for QuickSight in the central reporting account](#deploy-a-cloudformation-stack-for-athena-in-the-central-reporting-account).
+1. Delete the resources in the stack, `patch-reporting`, deployed in the section [Deploy a CloudFormation stack for Athena in the central reporting account](#deploy-a-cloudformation-stack-for-athena-in-the-central-reporting-account).
+
+For information on how to delete CloudFormation stacks, see [Delete a stack from the CloudFormation console](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-delete-stack.html).
 
 ## Next steps
 

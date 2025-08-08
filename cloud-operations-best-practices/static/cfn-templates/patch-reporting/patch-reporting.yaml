@@ -53,11 +53,17 @@ Metadata:
         Parameters:
           - EnableGlueCrawlerSchedule
           - GlueCrawlerSchedule
+      - Label:
+          default: QuickSight
+        Parameters:
+          - EnableQuickSightKMS
     ParameterLabels:
       OrganizationId:
         default: Organization ID
       EnableGlueCrawlerSchedule:
         default: Enable Glue Crawler Schedule
+      EnableQuickSightKMS:
+        default: Enable KMS permissions for QuickSight service role
       GlueCrawlerSchedule:
         default: Glue Crawler Schedule (cron)
 
@@ -66,12 +72,19 @@ Metadata:
 #-----------------------------------------------------------
 Parameters:
   EnableGlueCrawlerSchedule:
-    Description: True or false to enable scheduled execution of the Glue Crawler
+    Description: True or false to enable scheduled execution of the Glue crawler
     Type: String
     Default: 'true'
     AllowedValues:
       - 'true'
       - 'false'
+  EnableQuickSightKMS:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable KMS key permissions for QuickSight service role
   GlueCrawlerSchedule:
     Description: Schedule expression for the Glue Crawler (cron format)
     Type: String
@@ -87,6 +100,7 @@ Parameters:
 
 Conditions:
   IsScheduleEnabled: !Equals [!Ref EnableGlueCrawlerSchedule, 'true']
+  EnableQuickSightKMSCondition: !Equals [!Ref EnableQuickSightKMS, "true"]
 
 Resources:
   #-------------------------------------------------
@@ -122,6 +136,22 @@ Resources:
             - kms:GenerateDataKey
             - kms:GenerateDataKeyWithoutPlaintext
           Resource: '*'
+        - !If
+          - EnableQuickSightKMSCondition
+          - Sid: Allow use of the key by Systems Manager and Quick Sight
+            Effect: Allow
+            Principal:
+              Service: ssm.amazonaws.com
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/service-role/aws-quicksight-service-role-v0
+            Action:
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey
+              - kms:GenerateDataKeyWithoutPlaintext
+            Resource: '*'
+          - !Ref AWS::NoValue
 
   ManagedInstanceDataEncryptionKeyAlias:
     Type: AWS::KMS::Alias
