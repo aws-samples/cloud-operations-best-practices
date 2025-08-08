@@ -32,7 +32,7 @@ Before adding the region if you are using a Control Tower environment, review:
 For organizations just beginning their AWS journey, enabling a new Region in a single AWS account is a straightforward process. Here's how to get started:
 
 1. First, log into your AWS Management Console with a user account that has administrative privileges. Once logged in, look for your account name in the top right navigation bar and click on it to reveal a dropdown menu. Select "Account Settings" from this menu.
-2. In the Account Settings page, scroll down until you find the "Regions" section. This is where AWS lists all opt-in regions available for your account. Look for "Asia Pacific (Auckland)" in the list of regions. Next to it, you'll find an enable button or toggle.
+2. In the Account Settings page, scroll down until you find the "Regions" section. This is where AWS lists all opt-in regions available for your account. Look for the region you want to opt-in in the list of regions. Next to it, you'll find an enable button or toggle.
 3. Click to enable the region and wait for the process to complete. This typically takes just a few minutes, but it's important to let the process finish before attempting to deploy resources in the new region.
 
 
@@ -68,7 +68,7 @@ Let's explore how to extend these controls to the new region, starting in your O
     1. Navigate to AWS Organizations
     2. Select your Management account
     3. Access Account Settings
-    4. Enable the Auckland region
+    4. Enable the opt-in region
     5. Wait for completion
 2. Then extend Control Tower to the new region:
     1. Access the Control Tower console
