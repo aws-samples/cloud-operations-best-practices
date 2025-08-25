@@ -36,7 +36,6 @@ Parameters:
   QuickSightUser:
     Description: QuickSight User
     Type: String
-    Default: Admin/erikwebe-Isengard
   Workgroup:
     Description: Name of the Athena workgroup for central patch reporting
     Type: String

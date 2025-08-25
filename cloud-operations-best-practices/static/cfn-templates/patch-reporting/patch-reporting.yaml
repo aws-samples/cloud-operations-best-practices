@@ -624,8 +624,9 @@ Resources:
         WHERE 
             ci.compliancetype = 'Patch'
             AND ci.status = 'COMPLIANT'
-            AND t.key = 'Patch'
-            AND t.value = 'true'
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
         LIMIT 20
 
   AthenaQueryNonCompliantPatch:
@@ -656,8 +657,9 @@ Resources:
         WHERE 
             ci.compliancetype = 'Patch'
             AND ci.status = 'NON_COMPLIANT'
-            AND t.key = 'Patch'
-            AND t.value = 'true'
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
             -- Add time-based filters if applicable
             -- AND ci.capturetime >= DATE '2025-07-01'
 
@@ -690,9 +692,10 @@ Resources:
             aws_patchsummary ps
         JOIN 
             aws_tag t ON ps.resourceid = t.resourceid
-        WHERE 
-            t.key = 'Patch'
-            AND t.value = 'true'
+        -- WHERE 
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
             -- Add time-based filter if applicable
             -- AND ps.capturetime >= DATE '2025-07-01'
         LIMIT 20
@@ -721,8 +724,9 @@ Resources:
             aws_tag t ON cs.resourceid = t.resourceid
         WHERE 
             cs.compliancetype = 'Patch'
-            AND t.key = 'Patch'
-            AND t.value = 'true'
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
             -- Consider adding status filter if only interested in specific status
             -- AND cs.status IN ('COMPLIANT', 'NON_COMPLIANT')
         LIMIT 20
@@ -752,13 +756,14 @@ Resources:
             aws_application app
         JOIN 
             aws_tag t ON app.resourceid = t.resourceid
-        WHERE 
-            t.key = 'Patch'
-            AND t.value = 'true'
-            AND (
+        WHERE
+            (
                 app.name = 'Amazon SSM Agent' 
                 OR app.name = 'amazon-ssm-agent'
             )
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
 
   AthenaQueryInstanceList:
     Type: AWS::Athena::NamedQuery
@@ -786,11 +791,12 @@ Resources:
         JOIN 
             aws_tag t ON ii.resourceid = t.resourceid
         WHERE 
-            t.key = 'Patch'
-            AND t.value = 'true'
-            AND ii.instancestatus = 'Active'
+            ii.instancestatus = 'Active'
             -- Consider adding platform filter if only interested in specific platforms
             -- AND ii.platformtype IN ('Linux', 'Windows')
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
 
   AthenaQueryInstanceApplications:
     Type: AWS::Athena::NamedQuery
@@ -817,9 +823,10 @@ Resources:
             aws_application app
         JOIN 
             aws_tag t ON app.resourceid = t.resourceid
-        WHERE 
-            t.key = 'Patch'
-            AND t.value = 'true'
+        -- WHERE 
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
             -- Consider adding filters to narrow results
             -- AND app.applicationtype = 'AWS'
             -- AND app.installedtime >= DATE '2025-01-01'

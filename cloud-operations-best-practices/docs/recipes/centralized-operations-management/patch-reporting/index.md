@@ -74,6 +74,12 @@ Implementing centralized patch compliance reporting involves several AWS service
 
 ### Central reporting account
 
+In the following diagram, the **Central Reporting** account is an AWS account within your AWS Organization dedicated for storing the patch and inventory metadata and querying or visualization.
+
+:::warning
+It is **not recommended** to use the [AWS Organization management account](https://docs.aws.amazon.com/managedservices/latest/userguide/management-account.html) as the **Central reporting account**. [AWS best practices for the management account](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_best-practices_mgmt-acct.html#bp_mgmt-acct_use-mgmt) recommends that you use the management account and its users and roles for tasks that **must** be performed only by that account. Store all of your AWS resources in other AWS accounts in the organization and keep them out of the management account.
+:::
+
 ![Architecture for the central reporting account](/img/recipes/central-reporting/architecture-diagram-reporting-account.png "Architecture for the central reporting account")
 
 1. The Glue crawler runs once a day to crawl the S3 bucket which hosts the resource data sync provided metadata.
@@ -191,6 +197,8 @@ After the page is refreshed, the status of your stack should be `CREATE_IN_PROGR
 
 :::tip
 Take note of the names of the Amazon S3 buckets for **AthenaQueryResultsBucket** and **ResourceDataSyncBucketName** which can be found in the **Outputs** tab of the CloudFormation stack. You will need these two values in the next section to deploy QuickSight.
+
+![Outputs of the CloudFormation stack to show the resource data sync S3 bucket name](/img/recipes/central-reporting/patch-reporting-cfn-outputs.png "Outputs of the CloudFormation stack to show the resource data sync S3 bucket name")
 :::
 
 #### Sample CloudFormation template for Amazon QuickSight visualization
@@ -268,14 +276,14 @@ The following walkthrough will use a delegated administrator account for CloudFo
     1. For **Specify template**, choose **Upload a template file**, select **Choose file**, choose the `organization-resource-data-sync.yaml` file, and then choose **Next**.
 1. On the **Specify StackSet details** page, perform the following steps:
     1. For **StackSet name**, enter a descriptive name, such as `org-resource-data-sync`.
-    1. For **ResourceDataSyncName**, enter the name for the resource data sync.
-    1. For **S3BucketName**, enter the name of the S3 bucket you created in the previous section.
+    1. For **Name of the resource data sync S3 bucket**, enter the name of the S3 bucket you created in the previous section.
     :::tip
     In the central reporting account, you can find the S3 bucket name in the **Outputs** of the CloudFormation stack provisioned.
     ![Outputs of the CloudFormation stack to show the resource data sync S3 bucket name](/img/recipes/central-reporting/patch-reporting-cfn-outputs.png "Outputs of the CloudFormation stack to show the resource data sync S3 bucket name")
     :::
-    1. For **S3BucketPrefix**, enter a name for the prefix used for the S3 bucket, such as `ResourceDataSync`.
-    1. For **S3BucketRegion**, enter the Region for the resource data sync S3 bucket.
+    1. For **Prefix for the resource data sync S3 bucket**, enter a name for the prefix used for the S3 bucket, such as `ResourceDataSync`.
+    1. For **AWS Region for the resource data sync S3 bucket**, enter the Region for the resource data sync S3 bucket.
+    1. For **Name of the resource data sync**, enter the name for the resource data sync.
     1. Choose **Next**.
 1. On the **Configure StackSet options** page, add any required tags, select **I acknowledge that AWS CloudFormation might create IAM resources**, and then choose **Next**.
 1. On the **Set deployment options** page, perform the following steps:
@@ -295,7 +303,7 @@ After the page is refreshed, you will be able to see your StackSet. The status w
 
 In the central reporting account, navigate to the [Amazon S3 console](https://console.aws.amazon.com/s3/home) and select the S3 bucket created by CloudFormation named similarly to `ssm-resource-sync-${region}-${account-id}`. In the S3 bucket, select the bucket prefix you provided when [deploying the CloudFormation StackSet](#deploy-a-cloudformation-stackset).
 
-In the bucket, you can see the various data types that are synchronized by the resource data sync automatically. If you have previously configured Inventory metadata gathering and performed at least a patch scan operation, you should see 13 folders in the S3 bucket. Each folder represents [metadata collected by Inventory](https://docs.aws.amazon.com/systems-manager/latest/userguide/inventory-schema.html).
+In the bucket, you can see the various data types that are synchronized by the resource data sync automatically. If you have previously configured Inventory metadata gathering and performed at least a patch scan operation, you should see additional folders (e.g. `AWS:Application`, `AWS:AWSComponent`) in the S3 bucket. Each folder represents [metadata collected by Inventory](https://docs.aws.amazon.com/systems-manager/latest/userguide/inventory-schema.html).
 
 ![S3 bucket folders for resource data sync metadata](/img/recipes/central-reporting/s3-bucket-objects.png "S3 bucket folders for resource data sync metadata")
 
