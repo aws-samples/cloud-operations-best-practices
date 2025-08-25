@@ -1,0 +1,362 @@
+#*
+#* Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#* SPDX-License-Identifier: MIT-0
+#*
+#* Permission is hereby granted, free of charge, to any person obtaining a copy of this
+#* software and associated documentation files (the "Software"), to deal in the Software
+#* without restriction, including without limitation the rights to use, copy, modify,
+#* merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+#* permit persons to whom the Software is furnished to do so.
+#*
+#* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+#* INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+#* PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+#* HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+#* OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+#* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#*
+
+#------------------------------------------------------------------------------
+#
+# Template: organization-resource-data-sync.yaml
+# Purpose: CloudFormation template to a resource data sync for AWS Organizations.
+#
+# Resources Created:
+# * CMK to encrypt the Resource Data Sync bucket
+# * S3 Bucket for Resource Data Sync
+# * Glue Database, Crawler, and IAM role for Resource Data Sync data
+# * Lambda function and IAM role to repair Glue schema
+# * S3 Bucket for Athena query results
+# * Four named Athena queries
+# * Lambda function and IAM role to clean up S3 buckets
+#
+# Clean-up Steps:
+# 1. Delete the CloudFormation Stack
+#
+#------------------------------------------------------------------------------
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for Resource Data Sync Lambda function with improved error handling and update capability'
+
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: 'S3 Bucket Configuration'
+        Parameters:
+          - S3BucketName
+          - S3BucketPrefix
+          - S3BucketRegion
+      - Label:
+          default: 'Resource Data Sync Configuration'
+        Parameters:
+          - ResourceDataSyncName
+    ParameterLabels:
+      S3BucketName:
+        default: Name of the resource data sync S3 bucket
+      S3BucketPrefix:
+        default: Prefix for the resource data sync S3 bucket
+      S3BucketRegion:
+        default: AWS Region for the resource data sync S3 bucket
+      ResourceDataSyncName:
+        default: Name of the resource data sync
+
+Parameters:
+  ResourceDataSyncName:
+    Type: String
+    Description: Name for the SSM Resource Data Sync
+    Default: 'OrganizationResourceDataSync'
+    AllowedPattern: '^[a-zA-Z0-9_.-]{1,64}$'
+    ConstraintDescription: Sync name can only contain alphanumeric characters, underscores, hyphens, and periods
+  
+  S3BucketName:
+    Type: String
+    Description: S3 bucket name for Resource Data Sync destination
+    AllowedPattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
+    ConstraintDescription: Bucket name must be valid S3 bucket name
+
+  S3BucketPrefix:
+    Type: String
+    Description: S3 bucket prefix for Resource Data Sync destination
+    Default: 'ResourceDataSync'
+    AllowedPattern: '^[a-zA-Z0-9!_.*''()/{}:-]*$'
+    ConstraintDescription: -| 
+      Prefix can contain alphanumeric characters and the following special characters, !_.*'()/{}:-
+
+  S3BucketRegion:
+    Type: String
+    Description: AWS Region where the resource data sync S3 bucket is located
+    AllowedPattern: '^[a-z]{2}(-gov)?-[a-z]+-[0-9]$'
+    ConstraintDescription: Must be a valid AWS region format (e.g., us-east-1, eu-west-2, ap-southeast-1)
+
+Resources:
+  #-------------------------------------------------
+  # Lambda function to create an AWS Organization Resource Data Sync
+  # Currently an AWS Organization Resource Data Sync can only be created from the API
+  # https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-inventory-datasync.html#systems-manager-inventory-resource-data-sync-AWS-Organizations
+  #-------------------------------------------------
+  ResourceDataSyncLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: ResourceDataSyncPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ssm:CreateResourceDataSync'
+                  - 'ssm:DeleteResourceDataSync'
+                  - 'ssm:ListResourceDataSync'
+                  - 'ssm:UpdateResourceDataSync'
+                Resource: '*'
+
+  ResourceDataSyncLambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt ResourceDataSyncLambdaRole.Arn
+      Runtime: python3.13
+      Timeout: 60
+      Environment:
+        Variables:
+          RESOURCE_DATA_SYNC_NAME: !Ref ResourceDataSyncName
+          S3BUCKET_NAME: !Ref S3BucketName
+          S3BUCKET_PREFIX: !Ref S3BucketPrefix
+          S3BUCKET_REGION: !Ref S3BucketRegion
+      Code:
+        ZipFile: |
+          import boto3
+          from botocore.config import Config
+          import os
+          import cfnresponse
+          import logging
+          import traceback
+          import time
+
+          # Configure logger
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+              """
+              Lambda handler for managing SSM Resource Data Sync as a CloudFormation custom resource
+              """
+              logger.info(f"Received event: {event}")
+              
+              response_data = {}
+              physical_resource_id = event.get('PhysicalResourceId', None)
+              request_type = event['RequestType']
+              
+              try:
+                  # Environment variables with validation
+                  RESOURCE_DATA_SYNC_NAME = os.environ.get('RESOURCE_DATA_SYNC_NAME')
+                  S3BUCKET_NAME = os.environ.get('S3BUCKET_NAME')
+                  S3BUCKET_PREFIX = os.environ.get('S3BUCKET_PREFIX')
+                  S3BUCKET_REGION = os.environ.get('S3BUCKET_REGION')
+                  
+                  # Validate required environment variables
+                  if not all([RESOURCE_DATA_SYNC_NAME, S3BUCKET_NAME, S3BUCKET_REGION]):
+                      raise ValueError("Missing required environment variables")
+                  
+                  config = Config(
+                      retries = {
+                          'max_attempts': 3,
+                          'mode': 'standard'
+                      }
+                  )
+
+                  # Create boto3 client with retry configuration
+                  ssm_client = boto3.client('ssm', config=config)
+                  
+                  # Set physical_resource_id if not provided
+                  if not physical_resource_id:
+                      physical_resource_id = f"ResourceDataSync-{RESOURCE_DATA_SYNC_NAME}"
+                  
+                  # Process based on request type
+                  if request_type == 'Create':
+                      response = create_resource_data_sync(ssm_client, RESOURCE_DATA_SYNC_NAME, 
+                                                         S3BUCKET_NAME, S3BUCKET_PREFIX, S3BUCKET_REGION)
+                      response_data['Message'] = f"Successfully created sync: {RESOURCE_DATA_SYNC_NAME}"
+                      response_data['SyncName'] = RESOURCE_DATA_SYNC_NAME
+                      
+                  elif request_type == 'Delete':
+                      response = delete_resource_data_sync(ssm_client, RESOURCE_DATA_SYNC_NAME)
+                      response_data['Message'] = f"Successfully deleted sync: {RESOURCE_DATA_SYNC_NAME}"
+                      
+                  elif request_type == 'Update':
+                      response = update_resource_data_sync(ssm_client, RESOURCE_DATA_SYNC_NAME, 
+                                                         S3BUCKET_NAME, S3BUCKET_PREFIX, S3BUCKET_REGION)
+                      response_data['Message'] = f"Successfully updated sync: {RESOURCE_DATA_SYNC_NAME}"
+                      response_data['SyncName'] = RESOURCE_DATA_SYNC_NAME
+                  
+                  logger.info(f"Operation completed successfully: {response_data}")
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data, physical_resource_id)
+                  
+              except Exception as e:
+                  error_msg = str(e)
+                  stack_trace = traceback.format_exc()
+                  logger.error(f"Error: {error_msg}")
+                  logger.error(f"Stack trace: {stack_trace}")
+                  
+                  response_data['Error'] = error_msg
+                  response_data['ErrorType'] = type(e).__name__
+                  
+                  cfnresponse.send(event, context, cfnresponse.FAILED, response_data, physical_resource_id)
+
+          def create_resource_data_sync(ssm_client, sync_name, bucket_name, prefix, region):
+              """
+              Create a new resource data sync
+              """
+              logger.info(f"Creating resource data sync: {sync_name}")
+              
+              # Check if sync already exists
+              if check_sync_exists(ssm_client, sync_name):
+                  logger.info(f"Sync {sync_name} already exists, skipping creation")
+                  return {"Status": "AlreadyExists"}
+              
+              try:
+                  response = ssm_client.create_resource_data_sync(
+                      SyncName=sync_name,
+                      S3Destination={
+                          'BucketName': bucket_name,
+                          'Prefix': prefix,
+                          'SyncFormat': 'JsonSerDe',
+                          'Region': region,
+                          'DestinationDataSharing': {
+                              'DestinationDataSharingType': 'Organization'
+                          }
+                      },
+                      SyncType='SyncToDestination'
+                  )
+                  
+                  logger.info(f"Created resource data sync: {sync_name}")
+                  return response
+                  
+              except ssm_client.exceptions.ResourceDataSyncInvalidConfigurationException as e:
+                  logger.error(f"Invalid sync configuration: {str(e)}")
+                  raise
+              except ssm_client.exceptions.ResourceDataSyncConflictException as e:
+                  logger.error(f"Sync conflict: {str(e)}")
+                  raise
+              except Exception as e:
+                  logger.error(f"Error creating sync: {str(e)}")
+                  raise
+
+          def delete_resource_data_sync(ssm_client, sync_name):
+              """
+              Delete an existing resource data sync
+              """
+              logger.info(f"Deleting resource data sync: {sync_name}")
+              
+              # Check if sync exists before attempting to delete
+              if not check_sync_exists(ssm_client, sync_name):
+                  logger.info(f"Sync {sync_name} does not exist, nothing to delete")
+                  return {"Status": "DoesNotExist"}
+              
+              try:
+                  response = ssm_client.delete_resource_data_sync(
+                      SyncName=sync_name,
+                      SyncType='SyncToDestination'
+                  )
+                  
+                  logger.info(f"Deleted resource data sync: {sync_name}")
+                  return response
+                  
+              except ssm_client.exceptions.ResourceDataSyncNotFoundException as e:
+                  logger.warning(f"Sync not found during deletion: {str(e)}")
+                  return {"Status": "AlreadyDeleted"}
+              except Exception as e:
+                  logger.error(f"Error deleting sync: {str(e)}")
+                  raise
+
+          def update_resource_data_sync(ssm_client, sync_name, bucket_name, prefix, region):
+              """
+              Update an existing resource data sync using the update_resource_data_sync API
+              """
+              logger.info(f"Updating resource data sync: {sync_name}")
+              
+              try:
+                  # Check if sync exists
+                  if not check_sync_exists(ssm_client, sync_name):
+                      logger.info(f"Sync {sync_name} does not exist, creating instead of updating")
+                      return create_resource_data_sync(ssm_client, sync_name, bucket_name, prefix, region)
+                  
+                  # Update the existing sync
+                  response = ssm_client.update_resource_data_sync(
+                      SyncName=sync_name,
+                      SyncType='SyncToDestination',
+                      SyncSource={
+                          'SourceType': 'AWS::S3::Bucket',
+                          'SourceInfo': {
+                              'S3Destination': {
+                                  'BucketName': bucket_name,
+                                  'Prefix': prefix,
+                                  'SyncFormat': 'JsonSerDe',
+                                  'Region': region,
+                                  'DestinationDataSharing': {
+                                      'DestinationDataSharingType': 'Organization'
+                                  }
+                              }
+                          }
+                      }
+                  )
+                  
+                  logger.info(f"Updated resource data sync: {sync_name}")
+                  return response
+                  
+              except ssm_client.exceptions.ResourceDataSyncNotFoundException as e:
+                  logger.warning(f"Sync not found during update: {str(e)}")
+                  logger.info(f"Creating sync {sync_name} instead")
+                  return create_resource_data_sync(ssm_client, sync_name, bucket_name, prefix, region)
+              except Exception as e:
+                  logger.error(f"Error updating sync: {str(e)}")
+                  raise
+
+          def check_sync_exists(ssm_client, sync_name):
+              """
+              Check if a resource data sync with the given name exists
+              """
+              try:
+                  syncs = ssm_client.list_resource_data_sync(
+                      SyncType='SyncToDestination'
+                  )
+                  
+                  return any(sync['SyncName'] == sync_name for sync in syncs.get('ResourceDataSyncItems', []))
+                  
+              except Exception as e:
+                  logger.error(f"Error checking sync existence: {str(e)}")
+                  raise
+
+  ResourceDataSyncCustomResource:
+    Type: 'Custom::ResourceDataSync'
+    Properties:
+      ServiceToken: !GetAtt ResourceDataSyncLambdaFunction.Arn
+      ServiceTimeout: 300
+      # These properties can be used to trigger updates when they change
+      ResourceDataSyncName: !Ref ResourceDataSyncName
+      S3BucketName: !Ref S3BucketName
+      S3BucketPrefix: !Ref S3BucketPrefix
+      S3BucketRegion: !Ref S3BucketRegion
+
+Outputs:
+  ResourceDataSyncName:
+    Description: 'Name of the created Resource Data Sync'
+    Value: !Ref ResourceDataSyncName
+  
+  ResourceDataSyncLambdaFunction:
+    Description: 'ARN of the Lambda function managing the Resource Data Sync'
+    Value: !GetAtt ResourceDataSyncLambdaFunction.Arn
+  
+  ResourceDataSyncCustomResource:
+    Description: 'Reference to the custom resource'
+    Value: !Ref ResourceDataSyncCustomResource

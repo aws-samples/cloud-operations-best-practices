@@ -1,0 +1,943 @@
+#*
+#* Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#* SPDX-License-Identifier: MIT-0
+#*
+#* Permission is hereby granted, free of charge, to any person obtaining a copy of this
+#* software and associated documentation files (the "Software"), to deal in the Software
+#* without restriction, including without limitation the rights to use, copy, modify,
+#* merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+#* permit persons to whom the Software is furnished to do so.
+#*
+#* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+#* INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+#* PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+#* HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+#* OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+#* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#*
+
+#------------------------------------------------------------------------------
+#
+# Template: patch-reporting.yaml
+# Purpose:  CloudFormation template to deploy patch reporting resources.
+#
+# Resources Created:
+# * CMK to encrypt the Resource Data Sync bucket
+# * S3 Bucket for Resource Data Sync
+# * Glue Database, Crawler, and IAM role for Resource Data Sync data
+# * Lambda function and IAM role to repair Glue schema
+# * S3 Bucket for Athena query results
+# * Four named Athena queries
+# * Lambda function and IAM role to clean up S3 buckets
+#
+# Clean-up Steps:
+# 1. Delete the CloudFormation Stack
+#
+#------------------------------------------------------------------------------
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation template to deploy resources for centralized patch management.
+
+#-----------------------------------------------------------
+# Metadata
+#-----------------------------------------------------------
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: General
+        Parameters:
+          - OrganizationId
+      - Label:
+          default: Glue Configuration
+        Parameters:
+          - EnableGlueCrawlerSchedule
+          - GlueCrawlerSchedule
+      - Label:
+          default: QuickSight
+        Parameters:
+          - EnableQuickSightKMS
+    ParameterLabels:
+      OrganizationId:
+        default: Organization ID
+      EnableGlueCrawlerSchedule:
+        default: Enable Glue Crawler Schedule
+      EnableQuickSightKMS:
+        default: Enable KMS permissions for QuickSight service role
+      GlueCrawlerSchedule:
+        default: Glue Crawler Schedule (cron)
+
+#-----------------------------------------------------------
+# Parameters
+#-----------------------------------------------------------
+Parameters:
+  EnableGlueCrawlerSchedule:
+    Description: True or false to enable scheduled execution of the Glue crawler
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+  EnableQuickSightKMS:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable KMS key permissions for QuickSight service role
+  GlueCrawlerSchedule:
+    Description: Schedule expression for the Glue Crawler (cron format)
+    Type: String
+    Default: 'cron(0 0 * * ? *)'
+    AllowedPattern: '^cron\([0-9*/, -?]+\)$'
+    ConstraintDescription: Must be a valid cron expression in the format 'cron(Minutes Hours Day-of-month Month Day-of-week Year)'
+  OrganizationId:
+    Description: Organization ID used for S3 bucket sharing
+    Type: String
+    Default: o-abcde12345
+    AllowedPattern: ^o-[a-z0-9]{8,32}$
+    ConstraintDescription: Must be a valid AWS Organization ID starting with 'o-'
+
+Conditions:
+  IsScheduleEnabled: !Equals [!Ref EnableGlueCrawlerSchedule, 'true']
+  EnableQuickSightKMSCondition: !Equals [!Ref EnableQuickSightKMS, "true"]
+
+Resources:
+  #-------------------------------------------------
+  # Key used to encrypt managed node data
+  #-------------------------------------------------
+  ManagedInstanceDataEncryptionKey:
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Key used to encrypt managed node data
+      Enabled: True
+      EnableKeyRotation: True
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: AccountPolicy
+        Statement:
+        - Sid: Enable IAM User Permissions
+          Effect: Allow
+          Principal:
+            AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+          Action: kms:*
+          Resource: '*'
+        - Sid: Allow use of the key by Systems Manager
+          Effect: Allow
+          Principal:
+            Service: ssm.amazonaws.com
+          Action:
+            - kms:DescribeKey
+            - kms:Encrypt
+            - kms:Decrypt
+            - kms:ReEncrypt*
+            - kms:GenerateDataKey
+            - kms:GenerateDataKeyWithoutPlaintext
+          Resource: '*'
+        - !If
+          - EnableQuickSightKMSCondition
+          - Sid: Allow use of the key by Systems Manager and Quick Sight
+            Effect: Allow
+            Principal:
+              Service: ssm.amazonaws.com
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/service-role/aws-quicksight-service-role-v0
+            Action:
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey
+              - kms:GenerateDataKeyWithoutPlaintext
+            Resource: '*'
+          - !Ref AWS::NoValue
+
+  ManagedInstanceDataEncryptionKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/SSM-ManagedInstanceDataEncryptionKey
+      TargetKeyId: !Ref ManagedInstanceDataEncryptionKey
+
+  #-------------------------------------------------
+  # Bucket used to store managed node data
+  #-------------------------------------------------
+  ResourceDataSyncBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'ssm-resource-sync-${AWS::Region}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !Ref ManagedInstanceDataEncryptionKey
+              SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      #-----------------------------------------------------------
+      # Example S3 lifecycle policy to expire old objects from resource data sync after 60 days
+      #-----------------------------------------------------------
+      # LifecycleConfiguration:
+      #   Rules:
+      #     - Id: ExpireOldData
+      #       Status: Enabled
+      #       ExpirationInDays: 60
+      #       NoncurrentVersionExpirationInDays: 60
+
+  #-------------------------------------------------
+  # Bucket policy to add to S3 bucket to store managed node data
+  # Ref: https://docs.aws.amazon.com/systems-manager/latest/userguide/inventory-create-resource-data-sync.html#systems-manager-inventory-resource-data-sync-AWS-Organizations
+  #-------------------------------------------------
+  ResourceDataSyncBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ResourceDataSyncBucket
+      PolicyDocument:
+        Statement:
+        - Sid: SSMBucketPermissionsCheck
+          Effect: Allow
+          Principal:
+            Service: ssm.amazonaws.com
+          Action: s3:GetBucketAcl
+          Resource: !Sub arn:${AWS::Partition}:s3:::${ResourceDataSyncBucket}
+        - Sid: SSMBucketDelivery
+          Effect: Allow
+          Principal:
+            Service: ssm.amazonaws.com
+          Action: s3:PutObject
+          Resource:
+          - !Sub arn:${AWS::Partition}:s3:::${ResourceDataSyncBucket}/*/accountid=*/*
+          Condition:
+            StringEquals:
+              s3:x-amz-acl: bucket-owner-full-control
+              aws:SourceOrgID: !Ref OrganizationId
+        - Sid: SSMBucketDeliveryTagging
+          Effect: Allow
+          Principal:
+            Service: ssm.amazonaws.com
+          Action: s3:PutObjectTagging
+          Resource:
+          - !Sub arn:${AWS::Partition}:s3:::${ResourceDataSyncBucket}/*/accountid=*/*
+
+  #-----------------------------------------------------------
+  # Configure Glue database, role, and crawler
+  #-----------------------------------------------------------
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: ssm_global_resource_sync
+        Description: Systems Manager Global Resource Data Sync Database
+
+  GlueCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      DatabaseName: !Ref GlueDatabase
+      Description: Crawler for AWS Systems Manager Resource Data Sync
+      Name: SSM-GlueCrawler
+      Role: !GetAtt GlueCrawlerRole.Arn
+      Schedule: !If 
+        - IsScheduleEnabled
+        - ScheduleExpression: !Ref GlueCrawlerSchedule
+        - !Ref AWS::NoValue
+      Targets:
+        S3Targets:
+          - Path: !Ref ResourceDataSyncBucket
+            Exclusions:
+              - '*/AWS:InstanceInformation/accountid=*/test.json'
+
+  GlueCrawlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: SSM-GlueCrawlerRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - glue.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Path: "/service-role/"
+      Description: Role created for Glue to access resource data sync S3 bucket
+      Policies:
+        - PolicyName: S3Actions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub ${ResourceDataSyncBucket.Arn}/*
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource: !GetAtt ManagedInstanceDataEncryptionKey.Arn
+
+  #-------------------------------------------------
+  # The AWS:InstanceInformation table includes a column named
+  # 'resourcetype', which is also a partition key, which causes
+  # Athena queries to fail. The following resources include an
+  # IAM role, a Lambda function, and CloudWatch Event rule, and
+  # a Lambda permission. The CloudWatch Event rule is triggered
+  # by the Glue crawler execution, which then invokes the Lambda
+  # function to delete the column.
+  #-------------------------------------------------
+  DeleteGlueTableColumnFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: SSM-DeleteGlueTableColumnFunctionRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: GlueActions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - glue:GetTable
+                  - glue:UpdateTable
+                Resource:
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabase}
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabase}/aws_instanceinformation
+
+  DeleteGlueTableColumnFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: SSM-DeleteGlueTableColumnFunction
+      Description:
+        Deletes the 'resourcetype' Glue table that causes an issue when loading partitions in Athena
+      Runtime: python3.13
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Timeout: 600
+      Role: !GetAtt DeleteGlueTableColumnFunctionRole.Arn
+      Environment:
+        Variables:
+          CRAWLER_NAME: !Ref GlueCrawler
+          DATABASE_NAME: !Ref GlueDatabase
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import boto3
+          from botocore.config import Config
+          import logging
+          import traceback
+          from botocore.exceptions import ClientError
+          import time
+
+          # Configure logger
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          # Constants
+          TABLE_NAME = 'aws_instanceinformation'
+          COLUMN_NAME = 'resourcetype'
+
+          # Initialize AWS clients with retry configuration
+          config = Config(
+              retries = {
+                  'max_attempts': 3,
+                  'mode': 'standard'
+              }
+          )
+          glue_client = boto3.client('glue', config=config)
+
+          def lambda_handler(event, context):
+              """
+              Lambda handler that processes Glue crawler events and removes problematic columns
+              from the aws_instanceinformation table.
+              """
+              try:
+                  logger.info(f"Received event: {json.dumps(event, default=str)}")
+                  
+                  # Validate environment variables
+                  validate_environment()
+                  
+                  # Validate event structure
+                  if 'detail' not in event or 'crawlerName' not in event['detail']:
+                      logger.error("Invalid event structure: missing 'detail.crawlerName'")
+                      return {
+                          'statusCode': 400,
+                          'body': 'Invalid event structure'
+                      }
+                      
+                  # Get the crawler name from the event
+                  event_crawler_name = event['detail']['crawlerName']
+                  
+                  if event_crawler_name == CRAWLER_NAME:
+                      logger.info(f"Processing event from target crawler: {CRAWLER_NAME}")
+                      return process_table(context)
+                  else:
+                      logger.info(f"Event from crawler {event_crawler_name} - not our target crawler {CRAWLER_NAME}")
+                      return {
+                          'statusCode': 200,
+                          'body': f'Ignoring event from crawler {event_crawler_name}'
+                      }
+              
+              except Exception as e:
+                  logger.error(f"Error processing event: {str(e)}")
+                  logger.error(traceback.format_exc())
+                  return {
+                      'statusCode': 500,
+                      'body': f'Error: {str(e)}'
+                  }
+
+          def validate_environment():
+              """Validate required environment variables"""
+              required_vars = ['CRAWLER_NAME', 'DATABASE_NAME']
+              missing_vars = [var for var in required_vars if not os.environ.get(var)]
+              
+              if missing_vars:
+                  error_msg = f"Missing required environment variables: {', '.join(missing_vars)}"
+                  logger.error(error_msg)
+                  raise ValueError(error_msg)
+                  
+              global CRAWLER_NAME, DATABASE_NAME
+              CRAWLER_NAME = os.environ['CRAWLER_NAME']
+              DATABASE_NAME = os.environ['DATABASE_NAME']
+              
+              logger.info(f"Environment validated - Crawler: {CRAWLER_NAME}, Database: {DATABASE_NAME}")
+
+          def process_table(context):
+              """Process the table by removing the specified column"""
+              try:
+                  account_id = context.invoked_function_arn.split(":")[4]
+                  
+                  # Get table definition
+                  table = get_table_definition(account_id)
+                  if not table:
+                      return {
+                          'statusCode': 404,
+                          'body': f'Table {TABLE_NAME} not found in database {DATABASE_NAME}'
+                      }
+                      
+                  # Remove the column
+                  if remove_column_from_table(table):
+                      # Update the table
+                      update_table_definition(account_id, table)
+                      return {
+                          'statusCode': 200,
+                          'body': f'Successfully removed column {COLUMN_NAME} from table {TABLE_NAME}'
+                      }
+                  else:
+                      return {
+                          'statusCode': 200,
+                          'body': f'Column {COLUMN_NAME} not found in table {TABLE_NAME}'
+                      }
+              
+              except Exception as e:
+                  logger.error(f"Error processing table: {str(e)}")
+                  raise
+
+          def get_table_definition(account_id):
+              """Get the table definition from Glue Data Catalog"""
+              try:
+                  logger.info(f"Retrieving table definition for {DATABASE_NAME}.{TABLE_NAME}")
+                  response = glue_client.get_table(
+                      CatalogId=account_id,
+                      DatabaseName=DATABASE_NAME,
+                      Name=TABLE_NAME
+                  )
+                  
+                  if 'Table' in response:
+                      logger.info(f"Successfully retrieved table definition")
+                      return response['Table']
+                  else:
+                      logger.warning(f"Table {TABLE_NAME} not found")
+                      return None
+                      
+              except glue_client.exceptions.EntityNotFoundException:
+                  logger.warning(f"Table {TABLE_NAME} not found in database {DATABASE_NAME}")
+                  return None
+              except Exception as e:
+                  logger.error(f"Error retrieving table definition: {str(e)}")
+                  raise
+
+          def remove_column_from_table(table):
+              """Remove the specified column from the table definition"""
+              columns = table['StorageDescriptor']['Columns']
+              original_column_count = len(columns)
+              
+              # Check if column exists
+              column_exists = any(col['Name'] == COLUMN_NAME for col in columns)
+              
+              if not column_exists:
+                  logger.info(f"Column {COLUMN_NAME} not found in table {TABLE_NAME}")
+                  return False
+              
+              # Remove the unwanted column
+              updated_columns = [col for col in columns if col['Name'] != COLUMN_NAME]
+              table['StorageDescriptor']['Columns'] = updated_columns
+              
+              logger.info(f"Removed column {COLUMN_NAME} from table definition (columns: {original_column_count} -> {len(updated_columns)})")
+              
+              # Clean up table object
+              cleanup_table_object(table)
+              return True
+
+          def cleanup_table_object(table):
+              """Remove unnecessary fields from table object before update"""
+              fields_to_remove = [
+                  'DatabaseName', 'CreatedBy', 'CreateTime', 'UpdateTime',
+                  'IsRegisteredWithLakeFormation', 'CatalogId', 'VersionId', 'IsMultiDialectView'
+              ]
+              
+              for field in fields_to_remove:
+                  if field in table:
+                      table.pop(field, None)
+                      
+              logger.debug(f"Cleaned up table object by removing unnecessary fields")
+
+          def update_table_definition(account_id, table):
+              """Update the table definition with retries"""
+              max_retries = 3
+              retry_delay = 2  # seconds
+              
+              for attempt in range(max_retries):
+                  try:
+                      logger.info(f"Updating table definition (attempt {attempt+1}/{max_retries})")
+                      
+                      response = glue_client.update_table(
+                          CatalogId=account_id,
+                          DatabaseName=DATABASE_NAME,
+                          TableInput=table
+                      )
+                      
+                      logger.info(f"Successfully updated table {TABLE_NAME}")
+                      return response
+                      
+                  except ClientError as e:
+                      if attempt < max_retries - 1:
+                          logger.warning(f"Update failed: {str(e)}. Retrying in {retry_delay} seconds...")
+                          time.sleep(retry_delay)
+                          retry_delay *= 2  # Exponential backoff
+                      else:
+                          logger.error(f"Failed to update table after {max_retries} attempts")
+                          raise
+
+
+  DeleteGlueTableColumnFunctionEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: SSM-DeleteGlueTableColumn
+      Description: Deletes resourcetype from Glue table
+      EventPattern:
+        source:
+          - aws.glue
+        detail-type:
+          - Glue Crawler State Change
+        detail:
+          state:
+            - Succeeded
+      Targets:
+        - Arn: !GetAtt DeleteGlueTableColumnFunction.Arn
+          Id: "TargetFunctionV1"
+
+  DeleteGlueTableColumnFunctionCloudWatchPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DeleteGlueTableColumnFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DeleteGlueTableColumnFunctionEventRule.Arn
+
+  #-------------------------------------------------
+  # Bucket used to store Athena query details
+  #-------------------------------------------------
+  AthenaQueryResultsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ssm-res-sync-athena-query-results-${AWS::Region}-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !Ref ManagedInstanceDataEncryptionKey
+              SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  #-----------------------------------------------------------
+  # Create Athena workgroup and named queries.
+  #-----------------------------------------------------------
+  AthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: patch-workgroup
+      State: ENABLED
+      RecursiveDeleteOption: true
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${AthenaQueryResultsBucket}
+
+  AthenaQueryCompliantPatch:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Join [ '-', [!Ref ResourceDataSyncBucket, 'database'] ]
+      Description: Example query to list managed nodes that are compliant for patching.
+      Name: QueryCompliantPatch
+      WorkGroup: !Ref AthenaWorkGroup
+      QueryString: |
+        SELECT 
+            ci.accountid,
+            ci.region,
+            ci.resourceid,
+            ci.status,
+            ci.id,
+            ci.title,
+            ci.classification,
+            ci.patchseverity,
+            ci.severity,
+            ci.executiontype,
+            ci.patchbaselineid,
+            ci.capturetime
+        FROM 
+            aws_complianceitem ci
+        JOIN 
+            aws_tag t ON ci.resourceid = t.resourceid
+        WHERE 
+            ci.compliancetype = 'Patch'
+            AND ci.status = 'COMPLIANT'
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
+        LIMIT 20
+
+  AthenaQueryNonCompliantPatch:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Join [ '-', [!Ref ResourceDataSyncBucket, 'database'] ]
+      Description: Example query to list managed nodes that are non-compliant for patching.
+      Name: QueryNonCompliantPatch
+      WorkGroup: !Ref AthenaWorkGroup
+      QueryString: |
+        SELECT 
+            ci.accountid,
+            ci.region,
+            ci.resourceid,
+            ci.status,
+            ci.id,
+            ci.title,
+            ci.classification,
+            ci.patchseverity,
+            ci.severity,
+            ci.executiontype,
+            ci.patchbaselineid,
+            ci.capturetime
+        FROM 
+            aws_complianceitem ci
+        JOIN 
+            aws_tag t ON ci.resourceid = t.resourceid
+        WHERE 
+            ci.compliancetype = 'Patch'
+            AND ci.status = 'NON_COMPLIANT'
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
+            -- Add time-based filters if applicable
+            -- AND ci.capturetime >= DATE '2025-07-01'
+
+        LIMIT 20
+
+  AthenaQueryPatchSummary:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Join [ '-', [!Ref ResourceDataSyncBucket, 'database'] ]
+      Description: Example query to provide a patch summary for managed nodes.
+      Name: QueryPatchSummary
+      WorkGroup: !Ref AthenaWorkGroup
+      QueryString: |
+        SELECT 
+            ps.accountid,
+            ps.region,
+            ps.resourceid,
+            ps.missingcount,
+            ps.criticalnoncompliantcount,
+            ps.othernoncompliantcount,
+            ps.installedpendingrebootcount,
+            ps.installedcount,
+            ps.failedcount,
+            ps.installedrejectedcount,
+            ps.operationtype,
+            ps.rebootoption,
+            ps.baselineid,
+            ps.capturetime
+        FROM 
+            aws_patchsummary ps
+        JOIN 
+            aws_tag t ON ps.resourceid = t.resourceid
+        -- WHERE 
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
+            -- Add time-based filter if applicable
+            -- AND ps.capturetime >= DATE '2025-07-01'
+        LIMIT 20
+
+  AthenaQueryComplianceSummaryPatch:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Join [ '-', [!Ref ResourceDataSyncBucket, 'database'] ]
+      Description: Example query to provide a compliance summary for patch for managed nodes.
+      Name: QueryComplianceSummaryPatch
+      WorkGroup: !Ref AthenaWorkGroup
+      QueryString: |
+        SELECT 
+            cs.accountid,
+            cs.region,
+            cs.resourceid,
+            cs.status,
+            cs.executiontype,
+            cs.overallseverity,
+            cs.compliantcriticalcount,
+            cs.patchbaselineid,
+            cs.capturetime
+        FROM 
+            aws_compliancesummary cs
+        JOIN 
+            aws_tag t ON cs.resourceid = t.resourceid
+        WHERE 
+            cs.compliancetype = 'Patch'
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
+            -- Consider adding status filter if only interested in specific status
+            -- AND cs.status IN ('COMPLIANT', 'NON_COMPLIANT')
+        LIMIT 20
+
+  AthenaQuerySSMAgent:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Join [ '-', [!Ref ResourceDataSyncBucket, 'database'] ]
+      Description: Example query to list SSM Agent versions installed on managed nodes.
+      Name: QuerySSMAgentVersion
+      WorkGroup: !Ref AthenaWorkGroup
+      QueryString: |
+        SELECT 
+            app.accountid,
+            app.region,
+            app.resourceid,
+            app.name,
+            app.version,
+            app.installedtime,
+            app.applicationtype,
+            app.summary,
+            app.architecture,
+            app.packageid,
+            app.publisher,
+            app.capturetime
+        FROM 
+            aws_application app
+        JOIN 
+            aws_tag t ON app.resourceid = t.resourceid
+        WHERE
+            (
+                app.name = 'Amazon SSM Agent' 
+                OR app.name = 'amazon-ssm-agent'
+            )
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
+
+  AthenaQueryInstanceList:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Join [ '-', [!Ref ResourceDataSyncBucket, 'database'] ]
+      Description: Example query to return a list of non-terminated managed nodes.
+      Name: QueryInstanceList
+      WorkGroup: !Ref AthenaWorkGroup
+      QueryString: |
+        SELECT 
+            ii.accountid,
+            ii.region,
+            ii.resourceid,
+            ii.computername,
+            ii.ipaddress,
+            ii.instancestatus,
+            ii.platformtype,
+            ii.platformname,
+            ii.platformversion,
+            ii.agenttype,
+            ii.agentversion,
+            ii.capturetime
+        FROM 
+            aws_instanceinformation ii
+        JOIN 
+            aws_tag t ON ii.resourceid = t.resourceid
+        WHERE 
+            ii.instancestatus = 'Active'
+            -- Consider adding platform filter if only interested in specific platforms
+            -- AND ii.platformtype IN ('Linux', 'Windows')
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
+
+  AthenaQueryInstanceApplications:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Join [ '-', [!Ref ResourceDataSyncBucket, 'database'] ]
+      Description: Example query to return a list of managed nodes and their applications installed.
+      Name: QueryInstanceApplications
+      WorkGroup: !Ref AthenaWorkGroup
+      QueryString: |
+        SELECT 
+            app.accountid,
+            app.region,
+            app.resourceid,
+            app.name,
+            app.version,
+            app.installedtime,
+            app.applicationtype,
+            app.summary,
+            app.architecture,
+            app.packageid,
+            app.publisher,
+            app.capturetime
+        FROM 
+            aws_application app
+        JOIN 
+            aws_tag t ON app.resourceid = t.resourceid
+        -- WHERE 
+            -- Add tag filters if applicable
+            -- AND t.key = 'Patch'
+            -- AND t.value = 'true'
+            -- Consider adding filters to narrow results
+            -- AND app.applicationtype = 'AWS'
+            -- AND app.installedtime >= DATE '2025-01-01'
+        LIMIT 20
+
+
+  #-------------------------------------------------
+  # IAM role, Lambda function, and custom resource to clean up S3 buckets
+  #-------------------------------------------------
+  S3CleanupLambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: LogAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:*:*:*
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketVersioning
+                  - s3:ListBucket
+                  - s3:ListBucketVersions
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${ResourceDataSyncBucket}
+                  - !Sub arn:${AWS::Partition}:s3:::${AthenaQueryResultsBucket}
+              - Effect: Allow
+                Action:
+                  - s3:DeleteObject
+                  - s3:DeleteObjectVersion
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${ResourceDataSyncBucket}/*
+                  - !Sub arn:${AWS::Partition}:s3:::${AthenaQueryResultsBucket}/*
+
+  S3BucketCleanup:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import cfnresponse
+          import boto3
+
+          def lambda_handler(event, context):
+            print(event)
+
+            # Globals
+            responseData = {}
+            ResponseStatus = cfnresponse.SUCCESS
+            s3BucketNamesEvent = event['ResourceProperties']['s3BucketNames']
+
+            s3BucketNames = s3BucketNamesEvent.split(",")
+
+            if event['RequestType'] == 'Create':
+              responseData['Message'] = "Resource creation successful!"
+            elif event['RequestType'] == 'Update':
+              responseData['Message'] = "Resource update successful!"
+            elif event['RequestType'] == 'Delete':
+              # Need to empty the S3 bucket before it is deleted
+              s3 = boto3.resource('s3')
+              for s3BucketName in s3BucketNames:
+                print(s3BucketName)
+                bucket = s3.Bucket(s3BucketName)
+                bucketVersioning = s3.BucketVersioning(s3BucketName)
+                if bucketVersioning.status == 'Enabled':
+                    response = bucket.object_versions.delete()
+                    print(response)
+                    bucket.objects.delete()
+                else:
+                    bucket.objects.delete()
+              responseData['Message'] = "Resource deletion successful!"
+
+            cfnresponse.send(event, context, ResponseStatus, responseData)
+      Description: This function is called when CloudFormation stack is created/updated/deleted and does cleanup the S3 bucket when the CF stack is deleted.
+      Handler: index.lambda_handler
+      MemorySize: 256
+      Role: !GetAtt S3CleanupLambdaExecutionRole.Arn
+      Runtime: python3.13
+      Timeout: 300
+
+  S3Cleanup:
+    Type: Custom::S3BucketCleanupFunction
+    Properties:
+      ServiceToken: !GetAtt S3BucketCleanup.Arn
+      s3BucketNames: !Sub "${ResourceDataSyncBucket},${AthenaQueryResultsBucket}"
+
+Outputs:
+  KMSKeyArn:
+    Description: The ARN of the custom KMS key.
+    Value: !GetAtt ManagedInstanceDataEncryptionKey.Arn
+  ResourceDataSyncBucketName:
+    Description: The name of the S3 bucket used to store resource data sync details.
+    Value: !Ref ResourceDataSyncBucket
+  AthenaQueryResultsBucket:
+    Description: The ARN of the S3 bucket used to store Athena query results.
+    Value: !GetAtt AthenaQueryResultsBucket.Arn
