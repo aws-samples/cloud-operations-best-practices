@@ -160,6 +160,10 @@ Using an [AWS Glue crawler](https://docs.aws.amazon.com/glue/latest/dg/add-crawl
 1. Query patch or inventory data using Amazon Athena.
 1. Visualize patch compliance using Amazon QuickSight.
 
+## Understanding AWS Systems Manager Inventory Metadata
+
 Resource data syncs push data to S3 buckets based on actions taken from on-demand actions (Registering or terminating instances /performing a patch scan or install), scheduled actions (Gathering software inventory, gathering custom inventory metadata, performing a patch install, and evaluating compliance using Chef InSpec).
 
 ![Inventory metadata](/img/guides/centralized-operations-management/patch-management/resource-data-sync-inventory-metadata.png "Inventory metadata")
+
+Source: [Understanding AWS Systems Manager Inventory Metadata](https://aws.amazon.com/blogs/mt/understanding-aws-systems-manager-inventory-metadata/)

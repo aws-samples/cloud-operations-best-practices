@@ -1,0 +1,686 @@
+#*
+#* Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#* SPDX-License-Identifier: MIT-0
+#*
+#* Permission is hereby granted, free of charge, to any person obtaining a copy of this
+#* software and associated documentation files (the "Software"), to deal in the Software
+#* without restriction, including without limitation the rights to use, copy, modify,
+#* merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+#* permit persons to whom the Software is furnished to do so.
+#*
+#* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+#* INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+#* PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+#* HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+#* OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+#* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#*
+
+#------------------------------------------------------------------------------
+#
+# Template: quicksight-patch-compliance.yaml
+# Purpose:  CloudFormation template to create QuickSight datasets for the Patch Compliance dashboard.
+#
+# Resources Created:
+# * QuickSight datasets for Systems Manager patching and inventory metadata
+#
+# Clean-up Steps:
+# 1. Delete the CloudFormation Stack
+#
+#------------------------------------------------------------------------------
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create QuickSight datasets for the Patch Compliance dashboard.
+
+Parameters:
+  QuickSightUser:
+    Description: QuickSight User
+    Type: String
+  Workgroup:
+    Description: Name of the Athena workgroup for central patch reporting
+    Type: String
+    Default: patch-workgroup
+
+Resources:
+  SSMDataSyncSource:
+    Type: AWS::QuickSight::DataSource
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSourceId: SSMDataSync
+      Name: SSM Resource Data Sync Data Source
+      Type: ATHENA
+      DataSourceParameters:
+        AthenaParameters:
+          WorkGroup: !Ref Workgroup
+      Permissions:
+        - Principal: !Sub arn:${AWS::Partition}:quicksight:${AWS::Region}:${AWS::AccountId}:user/default/${QuickSightUser}
+          Actions:
+          - quicksight:UpdateDataSourcePermissions
+          - quicksight:DescribeDataSourcePermissions
+          - quicksight:PassDataSource
+          - quicksight:DescribeDataSource
+          - quicksight:DeleteDataSource
+          - quicksight:UpdateDataSource
+
+  ApplicationDataSet:
+    Type: AWS::QuickSight::DataSet
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSetId: ssm_aws_application
+      Name: ssm_aws_application
+      ImportMode: DIRECT_QUERY
+      Permissions:
+        - Principal: !Sub arn:${AWS::Partition}:quicksight:${AWS::Region}:${AWS::AccountId}:user/default/${QuickSightUser}
+          Actions:
+          - quicksight:PassDataSet
+          - quicksight:DescribeIngestion
+          - quicksight:CreateIngestion
+          - quicksight:UpdateDataSet
+          - quicksight:DeleteDataSet
+          - quicksight:DescribeDataSet
+          - quicksight:CancelIngestion
+          - quicksight:DescribeDataSetPermissions
+          - quicksight:ListIngestions
+          - quicksight:UpdateDataSetPermissions
+      PhysicalTableMap:
+        aws-application:
+          RelationalTable:
+            DataSourceArn: !GetAtt SSMDataSyncSource.Arn
+            Catalog: AwsDataCatalog
+            Schema: ssm_global_resource_sync
+            Name: aws_application
+            InputColumns:
+            - Name: applicationtype
+              Type: STRING
+            - Name: installedtime
+              Type: STRING
+            - Name: architecture
+              Type: STRING
+            - Name: version
+              Type: STRING
+            - Name: summary
+              Type: STRING
+            - Name: packageid
+              Type: STRING
+            - Name: publisher
+              Type: STRING
+            - Name: release
+              Type: STRING
+            - Name: url
+              Type: STRING
+            - Name: name
+              Type: STRING
+            - Name: resourceid
+              Type: STRING
+            - Name: capturetime
+              Type: STRING
+            - Name: schemaversion
+              Type: STRING
+            - Name: epoch
+              Type: STRING
+            - Name: accountid
+              Type: STRING
+            - Name: region
+              Type: STRING
+            - Name: resourcetype
+              Type: STRING
+
+  ComplianceItemDataSet:
+    Type: AWS::QuickSight::DataSet
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSetId: ssm_aws_complianceitem
+      Name: ssm_aws_complianceitem
+      ImportMode: DIRECT_QUERY
+      Permissions:
+        - Principal: !Sub arn:${AWS::Partition}:quicksight:${AWS::Region}:${AWS::AccountId}:user/default/${QuickSightUser}
+          Actions:
+          - quicksight:PassDataSet
+          - quicksight:DescribeIngestion
+          - quicksight:CreateIngestion
+          - quicksight:UpdateDataSet
+          - quicksight:DeleteDataSet
+          - quicksight:DescribeDataSet
+          - quicksight:CancelIngestion
+          - quicksight:DescribeDataSetPermissions
+          - quicksight:ListIngestions
+          - quicksight:UpdateDataSetPermissions
+      PhysicalTableMap:
+        aws-complianceitem:
+          RelationalTable:
+            DataSourceArn: !GetAtt SSMDataSyncSource.Arn
+            Catalog: AwsDataCatalog
+            Schema: ssm_global_resource_sync
+            Name: aws_complianceitem
+            InputColumns:
+            - Name: status
+              Type: STRING
+            - Name: installedtime
+              Type: STRING
+            - Name: executiontype
+              Type: STRING
+            - Name: patchseverity
+              Type: STRING
+            - Name: title
+              Type: STRING
+            - Name: severity
+              Type: STRING
+            - Name: executiontime
+              Type: STRING
+            - Name: compliancetype
+              Type: STRING
+            - Name: classification
+              Type: STRING
+            - Name: id
+              Type: STRING
+            - Name: documentversion
+              Type: STRING
+            - Name: patchstate
+              Type: STRING
+            - Name: patchbaselineid
+              Type: STRING
+            - Name: documentname
+              Type: STRING
+            - Name: patchgroup
+              Type: STRING
+            - Name: executionid
+              Type: STRING
+            - Name: resourceid
+              Type: STRING
+            - Name: capturetime
+              Type: STRING
+            - Name: schemaversion
+              Type: STRING
+            - Name: accountid
+              Type: STRING
+            - Name: region
+              Type: STRING
+            - Name: resourcetype
+              Type: STRING
+
+  ComplianceSummaryDataSet:
+    Type: AWS::QuickSight::DataSet
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSetId: ssm_aws_compliancesummary
+      Name: ssm_aws_compliancesummary
+      ImportMode: DIRECT_QUERY
+      Permissions:
+        - Principal: !Sub arn:${AWS::Partition}:quicksight:${AWS::Region}:${AWS::AccountId}:user/default/${QuickSightUser}
+          Actions:
+          - quicksight:PassDataSet
+          - quicksight:DescribeIngestion
+          - quicksight:CreateIngestion
+          - quicksight:UpdateDataSet
+          - quicksight:DeleteDataSet
+          - quicksight:DescribeDataSet
+          - quicksight:CancelIngestion
+          - quicksight:DescribeDataSetPermissions
+          - quicksight:ListIngestions
+          - quicksight:UpdateDataSetPermissions
+      PhysicalTableMap:
+        aws-compliancesummary:
+          RelationalTable:
+            DataSourceArn: !GetAtt SSMDataSyncSource.Arn
+            Catalog: AwsDataCatalog
+            Schema: ssm_global_resource_sync
+            Name: aws_compliancesummary
+            InputColumns:
+            - Name: compliancetype
+              Type: STRING
+            - Name: patchgroup
+              Type: STRING
+            - Name: patchbaselineid
+              Type: STRING
+            - Name: status
+              Type: STRING
+            - Name: overallseverity
+              Type: STRING
+            - Name: executiontime
+              Type: STRING
+            - Name: executionid
+              Type: STRING
+            - Name: executiontype
+              Type: STRING
+            - Name: compliantcriticalcount
+              Type: STRING
+            - Name: complianthighcount
+              Type: STRING
+            - Name: compliantmediumcount
+              Type: STRING
+            - Name: compliantlowcount
+              Type: STRING
+            - Name: compliantinformationalcount
+              Type: STRING
+            - Name: compliantunspecifiedcount
+              Type: STRING
+            - Name: noncompliantcriticalcount
+              Type: STRING
+            - Name: noncomplianthighcount
+              Type: STRING
+            - Name: noncompliantmediumcount
+              Type: STRING
+            - Name: noncompliantlowcount
+              Type: STRING
+            - Name: noncompliantinformationalcount
+              Type: STRING
+            - Name: noncompliantunspecifiedcount
+              Type: STRING
+            - Name: resourceid
+              Type: STRING
+            - Name: capturetime
+              Type: STRING
+            - Name: schemaversion
+              Type: STRING
+            - Name: accountid
+              Type: STRING
+            - Name: region
+              Type: STRING
+            - Name: resourcetype
+              Type: STRING
+
+  InstanceDetailedInformationDataSet:
+    Type: AWS::QuickSight::DataSet
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSetId: ssm_aws_instancedetailedinformation
+      Name: ssm_aws_instancedetailedinformation
+      ImportMode: DIRECT_QUERY
+      Permissions:
+        - Principal: !Sub arn:${AWS::Partition}:quicksight:${AWS::Region}:${AWS::AccountId}:user/default/${QuickSightUser}
+          Actions:
+          - quicksight:PassDataSet
+          - quicksight:DescribeIngestion
+          - quicksight:CreateIngestion
+          - quicksight:UpdateDataSet
+          - quicksight:DeleteDataSet
+          - quicksight:DescribeDataSet
+          - quicksight:CancelIngestion
+          - quicksight:DescribeDataSetPermissions
+          - quicksight:ListIngestions
+          - quicksight:UpdateDataSetPermissions
+      PhysicalTableMap:
+        aws-instancedetailedinformation:
+          RelationalTable:
+            DataSourceArn: !GetAtt SSMDataSyncSource.Arn
+            Catalog: AwsDataCatalog
+            Schema: ssm_global_resource_sync
+            Name: aws_instancedetailedinformation
+            InputColumns:
+            - Name: cpus
+              Type: STRING
+            - Name: osservicepack
+              Type: STRING
+            - Name: cpuhyperthreadenabled
+              Type: STRING
+            - Name: cpuspeedmhz
+              Type: STRING
+            - Name: cpusockets
+              Type: STRING
+            - Name: cpucores
+              Type: STRING
+            - Name: cpumodel
+              Type: STRING
+            - Name: resourceid
+              Type: STRING
+            - Name: capturetime
+              Type: STRING
+            - Name: schemaversion
+              Type: STRING
+            - Name: kernelversion
+              Type: STRING
+            - Name: accountid
+              Type: STRING
+            - Name: region
+              Type: STRING
+            - Name: resourcetype
+              Type: STRING
+
+  InstanceInformationDataSet:
+    Type: AWS::QuickSight::DataSet
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSetId: ssm_aws_instanceinformation
+      Name: ssm_aws_instanceinformation
+      ImportMode: DIRECT_QUERY
+      Permissions:
+        - Principal: !Sub arn:${AWS::Partition}:quicksight:${AWS::Region}:${AWS::AccountId}:user/default/${QuickSightUser}
+          Actions:
+          - quicksight:PassDataSet
+          - quicksight:DescribeIngestion
+          - quicksight:CreateIngestion
+          - quicksight:UpdateDataSet
+          - quicksight:DeleteDataSet
+          - quicksight:DescribeDataSet
+          - quicksight:CancelIngestion
+          - quicksight:DescribeDataSetPermissions
+          - quicksight:ListIngestions
+          - quicksight:UpdateDataSetPermissions
+      PhysicalTableMap:
+        aws-instanceinformation:
+          RelationalTable:
+            DataSourceArn: !GetAtt SSMDataSyncSource.Arn
+            Catalog: AwsDataCatalog
+            Schema: ssm_global_resource_sync
+            Name: aws_instanceinformation
+            InputColumns:
+            - Name: platformname
+              Type: STRING
+            - Name: platformversion
+              Type: STRING
+            - Name: agenttype
+              Type: STRING
+            - Name: agentversion
+              Type: STRING
+            - Name: instanceid
+              Type: STRING
+            - Name: instancestatus
+              Type: STRING
+            - Name: computername
+              Type: STRING
+            - Name: ipaddress
+              Type: STRING
+            - Name: platformtype
+              Type: STRING
+            - Name: resourceid
+              Type: STRING
+            - Name: capturetime
+              Type: STRING
+            - Name: schemaversion
+              Type: STRING
+            - Name: accountid
+              Type: STRING
+            - Name: region
+              Type: STRING
+            - Name: resourcetype
+              Type: STRING
+      LogicalTableMap:
+        aws-instanceinformation:
+          Alias: ssm_aws_instanceinformation
+          DataTransforms:
+          - CreateColumnsOperation:
+              Columns:
+              - ColumnName: CaptureDateTime
+                ColumnId: 8aaf7f26-9d68-434c-ba96-c4b96333a3ea
+                Expression: ifelse(strlen({capturetime})>0,parseDate(replace(substring({capturetime},1,19),'T'," "),'yyyy-MM-dd HH:mm:ss'),NULL)
+          - ProjectOperation:
+              ProjectedColumns:
+              - platformname
+              - platformversion
+              - agenttype
+              - agentversion
+              - instanceid
+              - instancestatus
+              - computername
+              - ipaddress
+              - platformtype
+              - resourceid
+              - capturetime
+              - schemaversion
+              - accountid
+              - region
+              - resourcetype
+              - CaptureDateTime
+          Source:
+            PhysicalTableId: aws-instanceinformation
+
+  TagDataSet:
+    Type: AWS::QuickSight::DataSet
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSetId: ssm_aws_tag
+      Name: ssm_aws_tag
+      ImportMode: DIRECT_QUERY
+      Permissions:
+        - Principal: !Sub arn:${AWS::Partition}:quicksight:${AWS::Region}:${AWS::AccountId}:user/default/${QuickSightUser}
+          Actions:
+          - quicksight:PassDataSet
+          - quicksight:DescribeIngestion
+          - quicksight:CreateIngestion
+          - quicksight:UpdateDataSet
+          - quicksight:DeleteDataSet
+          - quicksight:DescribeDataSet
+          - quicksight:CancelIngestion
+          - quicksight:DescribeDataSetPermissions
+          - quicksight:ListIngestions
+          - quicksight:UpdateDataSetPermissions
+      PhysicalTableMap:
+        aws-tag:
+          RelationalTable:
+            DataSourceArn: !GetAtt SSMDataSyncSource.Arn
+            Catalog: AwsDataCatalog
+            Schema: ssm_global_resource_sync
+            Name: aws_tag
+            InputColumns:
+            - Name: key
+              Type: STRING
+            - Name: value
+              Type: STRING
+            - Name: resourceid
+              Type: STRING
+            - Name: capturetime
+              Type: STRING
+            - Name: schemaversion
+              Type: STRING
+            - Name: accountid
+              Type: STRING
+            - Name: region
+              Type: STRING
+            - Name: resourcetype
+              Type: STRING
+
+  # DataSet JOIN: aws_instanceinformation+aws_compliancesummary+aws_tag
+  JoinedDataSet:
+    DependsOn: 
+    - ComplianceSummaryDataSet
+    - InstanceInformationDataSet
+    - TagDataSet
+    Type: AWS::QuickSight::DataSet
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSetId: ssm_instances_compliance
+      Name: ssm_instances_compliance
+      ImportMode: DIRECT_QUERY
+      Permissions:
+        - Principal: !Sub arn:${AWS::Partition}:quicksight:${AWS::Region}:${AWS::AccountId}:user/default/${QuickSightUser}
+          Actions:
+          - quicksight:PassDataSet
+          - quicksight:DescribeIngestion
+          - quicksight:CreateIngestion
+          - quicksight:UpdateDataSet
+          - quicksight:DeleteDataSet
+          - quicksight:DescribeDataSet
+          - quicksight:CancelIngestion
+          - quicksight:DescribeDataSetPermissions
+          - quicksight:ListIngestions
+          - quicksight:UpdateDataSetPermissions
+      PhysicalTableMap:
+        ssm-instancecompliance:
+          CustomSql:
+            DataSourceArn: !GetAtt SSMDataSyncSource.Arn
+            Name: ssm_instances_compliance
+            SqlQuery: |-
+              SELECT instance.capturetime,
+                instance.resourceid,
+                tag.value as "Name",
+                instance.platformtype,
+                instance.platformname,
+                instance.platformversion,
+                instance.instancestatus,
+                instance.region,
+                instance.accountid,
+                instance.computername,
+                instance.ipaddress,
+                compliance.status,
+                compliance.patchbaselineid
+                FROM ssm_global_resource_sync.aws_instanceinformation as instance
+                LEFT JOIN ssm_global_resource_sync.aws_compliancesummary as compliance
+                ON instance.resourceid = compliance.resourceid
+                AND compliance.compliancetype = 'Patch'
+                LEFT JOIN ssm_global_resource_sync.aws_tag as tag
+                ON instance.resourceid = tag.resourceid AND tag.key = 'Name'
+            Columns:
+            - Name: capturetime
+              Type: STRING
+            - Name: resourceid
+              Type: STRING
+            - Name: Name
+              Type: STRING
+            - Name: platformtype
+              Type: STRING
+            - Name: platformname
+              Type: STRING
+            - Name: platformversion
+              Type: STRING
+            - Name: instancestatus
+              Type: STRING
+            - Name: region
+              Type: STRING
+            - Name: accountid
+              Type: STRING
+            - Name: computername
+              Type: STRING
+            - Name: ipaddress
+              Type: STRING
+            - Name: status
+              Type: STRING
+            - Name: patchbaselineid
+              Type: STRING
+
+  # ApplicationDataSetRefreshSchedule:
+  #   DependsOn:
+  #   - ApplicationDataSet
+  #   Type: AWS::QuickSight::RefreshSchedule
+  #   Properties:
+  #     AwsAccountId: !Ref AWS::AccountId
+  #     DataSetId: ssm_aws_application
+  #     Schedule: 
+  #       RefreshType: FULL_REFRESH
+  #       ScheduleFrequency: 
+  #         Interval: DAILY
+  #         TimeOfTheDay: 00:00
+  #       ScheduleId: application-dataset-refresh
+
+  # ComplianceItemDataSetRefreshSchedule:
+  #   DependsOn:
+  #   - ComplianceItemDataSet
+  #   Type: AWS::QuickSight::RefreshSchedule
+  #   Properties:
+  #     AwsAccountId: !Ref AWS::AccountId
+  #     DataSetId: ssm_aws_complianceitem
+  #     Schedule: 
+  #       RefreshType: FULL_REFRESH
+  #       ScheduleFrequency: 
+  #         Interval: DAILY
+  #         TimeOfTheDay: 00:00
+  #       ScheduleId: complianceitem-dataset-refresh
+
+  # ComplianceSummaryDataSetRefreshSchedule:
+  #   DependsOn:
+  #   - ComplianceSummaryDataSet
+  #   Type: AWS::QuickSight::RefreshSchedule
+  #   Properties:
+  #     AwsAccountId: !Ref AWS::AccountId
+  #     DataSetId: ssm_aws_compliancesummary
+  #     Schedule: 
+  #       RefreshType: FULL_REFRESH
+  #       ScheduleFrequency: 
+  #         Interval: DAILY
+  #         TimeOfTheDay: 00:00
+  #       ScheduleId: compliancesummary-dataset-refresh
+
+  # InstanceDetailedInformationDataSetRefreshSchedule:
+  #   DependsOn:
+  #   - InstanceDetailedInformationDataSet
+  #   Type: AWS::QuickSight::RefreshSchedule
+  #   Properties:
+  #     AwsAccountId: !Ref AWS::AccountId
+  #     DataSetId: ssm_aws_instancedetailedinformation
+  #     Schedule: 
+  #       RefreshType: FULL_REFRESH
+  #       ScheduleFrequency: 
+  #         Interval: DAILY
+  #         TimeOfTheDay: 00:00
+  #       ScheduleId: instancedetailedinformation-dataset-refresh
+
+  # InstanceInformationDataSetRefreshSchedule:
+  #   DependsOn:
+  #   - InstanceInformationDataSet
+  #   Type: AWS::QuickSight::RefreshSchedule
+  #   Properties:
+  #     AwsAccountId: !Ref AWS::AccountId
+  #     DataSetId: ssm_aws_instanceinformation
+  #     Schedule: 
+  #       RefreshType: FULL_REFRESH
+  #       ScheduleFrequency: 
+  #         Interval: DAILY
+  #         TimeOfTheDay: 00:00
+  #       ScheduleId: nstanceinformation-dataset-refresh
+
+  # TagDataSetRefreshSchedule:
+  #   DependsOn:
+  #   - TagDataSet
+  #   Type: AWS::QuickSight::RefreshSchedule
+  #   Properties:
+  #     AwsAccountId: !Ref AWS::AccountId
+  #     DataSetId: ssm_aws_tag
+  #     Schedule: 
+  #       RefreshType: FULL_REFRESH
+  #       ScheduleFrequency: 
+  #         Interval: DAILY
+  #         TimeOfTheDay: 00:00
+  #       ScheduleId: tag-dataset-refresh
+
+  # JoinedDataSetRefreshSchedule:
+  #   DependsOn:
+  #   - JoinedDataSet
+  #   Type: AWS::QuickSight::RefreshSchedule
+  #   Properties:
+  #     AwsAccountId: !Ref AWS::AccountId
+  #     DataSetId: ssm_instances_compliance
+  #     Schedule: 
+  #       RefreshType: FULL_REFRESH
+  #       ScheduleFrequency: 
+  #         Interval: DAILY
+  #         TimeOfTheDay: 00:00
+  #       ScheduleId: instances-dataset-refresh
+
+  ManagedNodeAnalysis:
+    Type: AWS::QuickSight::Analysis
+    Properties:
+      AnalysisId: ManagedNodeAnalysis
+      AwsAccountId: !Ref AWS::AccountId
+      Name: Managed Node Analysis CFN
+      Definition:
+        Sheets:
+          - Name: InstanceInformationSheet
+            SheetId: InstanceInformationSheet
+            ContentType: INTERACTIVE
+          - Name: PatchComplianceSheet
+            SheetId: PatchComplianceSheet
+            ContentType: INTERACTIVE
+        DataSetIdentifierDeclarations:
+          - Identifier: ssm_aws_application
+            DataSetArn: !GetAtt ApplicationDataSet.Arn
+          - Identifier: ssm_aws_complianceitem
+            DataSetArn: !GetAtt ComplianceItemDataSet.Arn
+          - Identifier: ssm_aws_compliancesummary
+            DataSetArn: !GetAtt ComplianceSummaryDataSet.Arn
+          - Identifier: ssm_aws_instancedetailedinformation
+            DataSetArn: !GetAtt InstanceDetailedInformationDataSet.Arn
+          - Identifier: ssm_aws_instanceinformation
+            DataSetArn: !GetAtt InstanceInformationDataSet.Arn
+          - Identifier: ssm_aws_tag
+            DataSetArn: !GetAtt TagDataSet.Arn
+          - Identifier: ssm_instances_compliance
+            DataSetArn: !GetAtt JoinedDataSet.Arn
+      Permissions:
+        - Principal: !Sub arn:${AWS::Partition}:quicksight:${AWS::Region}:${AWS::AccountId}:user/default/${QuickSightUser}
+          Actions:
+          - quicksight:DeleteAnalysis
+          - quicksight:DescribeAnalysis
+          - quicksight:DescribeAnalysisPermissions
+          - quicksight:QueryAnalysis
+          - quicksight:RestoreAnalysis
+          - quicksight:UpdateAnalysis
+          - quicksight:UpdateAnalysisPermissions
