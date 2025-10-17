@@ -3,15 +3,13 @@ sidebar_position: 14
 ---
 # Advanced Event Selectors
 
-## Introduction
-
 ### Understanding Advanced Event Selectors
 
 Advanced event selectors in AWS CloudTrail provide granular control over which data events are logged, advanced event selectors allow you to specify specific conditions using field-based filtering with operators like equals, not equals, starts with, and ends with. This granular approach enables organizations to capture only the data events that matter for their security, compliance, and operational requirements while reducing costs associated with excessive event logging.
 
 Advanced event selectors consist of field selectors, operators, and values. Each selector contains an array of field selectors that define the filtering criteria, with each field selector specifying a field name (such as eventCategory, eventName, or resources.type), an operator (equals, notEquals, startsWith, endsWith), and one or more values to match against. The relationship between multiple field selectors within a single advanced event selector is logical AND, meaning all conditions must be met for an event to be included.
 
-![Advanced Event Selectors](/img/guides/cloudtrail/CloudTrail-AES.png "Advanced Event Selectors for Data Events")
+![CloudTrail Advanced Event Selectors](/img/guides/cloudtrail-lake/cloudtrail-data-events-advanced-selector.png "Advanced Event Selectors for Data Events")
 
 ### Supported Fields and Operators
 
