@@ -21,7 +21,7 @@ The following will provide examples on how advanced event selectors can be used 
 
 #### Critical Write Operations Filter
 
-This filter focuses on high-risk S3 operations that could indicate data exfiltration, unauthorized modifications, or compliance violations. By monitoring only write operations on sensitive buckets, organizations can detect malicious activity while reducing log volume by 70-80% compared to logging all S3 events. This approach is essential for maintaining security visibility without overwhelming security teams with routine read operations.
+This filter focuses on high-risk S3 operations that could indicate data exfiltration, unauthorized modifications, or compliance violations. By monitoring only write operations on sensitive buckets, organizations can detect malicious activity while reducing the log volume of S3 events. This approach is essential for maintaining security visibility without overwhelming security teams with routine read operations.
 
 ```json
 [
@@ -259,7 +259,7 @@ User identity filtering allows you to include or exclude events for actions take
 
 #### Write Operations Filter
 
-The readOnly field filter is crucial for focusing on events that represent actual changes to your environment. By filtering for write operations only, organizations can reduce log volume by 60-70% while maintaining visibility into all actions that could impact security or compliance. This filter is particularly effective when combined with specific resource types or event sources.
+The readOnly field filter is crucial for focusing on events that represent actual changes to your environment. By filtering for write operations only, organizations can reduce log volume while maintaining visibility into all actions that could impact security or compliance. This filter is particularly effective when combined with specific resource types or event sources.
 
 #### Service-Specific Event Source Filter
 
