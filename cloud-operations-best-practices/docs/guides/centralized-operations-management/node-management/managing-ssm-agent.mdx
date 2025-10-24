@@ -185,6 +185,10 @@ The latest Amazon EKS optimized AMIs install SSM Agent automatically. If you are
 
 For instances that are already running in your environment, you can install SSM Agent using various remote access and automation methods. The installation process varies depending on your operating system type, access methods available, and network configuration. This section describes different approaches you can use to install SSM Agent on your existing instances.
 
+#### Custom solution 
+Refer to the [public blog](https://aws.amazon.com/blogs/mt/automate-installing-ssm-agent-on-unmanaged-ec2-instances-in-an-aws-organization/) on **Automate installing AWS Systems Manager agent on unmanaged Amazon EC2 nodes**. 
+This solution uses userdata to install ssm agent and automation runbooks orchestrate this process accross regions and accounts.
+
 #### Configuration management tools
 
  If your organization uses configuration management tools such as Puppet, Chef, or Ansible, you can leverage these existing tools to deploy SSM Agent across your instances.
