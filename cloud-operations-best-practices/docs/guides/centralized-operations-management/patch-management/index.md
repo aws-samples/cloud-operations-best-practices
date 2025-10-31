@@ -146,6 +146,10 @@ While these views are specific to the local AWS account and Region, you can crea
 
 ## Creating end-to-end patch management and inventory reporting in an AWS Organization
 
+:::tip
+Did you know you can use [Amazon Quick Suite](https://aws.amazon.com/quicksuite/) to reduce a multi-step manual process into a few simple prompts, enabling you to quickly generate insightful patching compliance and inventory visualizations. Discover how AI-powered capabilities help you create dynamic dashboards, saving valuable time while maintaining accuracy and providing real-time insights into your organization's patching status in the blog: [Building enterprise patching and inventory dashboards using Amazon Quick Suite](https://aws.amazon.com/blogs/mt/building-enterprise-patching-and-inventory-dashboards-using-amazon-q-in-amazon-quicksuite/).
+:::
+
 To create a report on patch compliance across your AWS Organization, you can use Systems Manager [resource data syncs](https://docs.aws.amazon.com/systems-manager/latest/userguide/inventory-create-resource-data-sync.html) to send inventory data collected from all of your managed nodes to a single Amazon S3 bucket. Resource data sync then automatically updates the centralized data when new inventory data is collected.
 
 Using an [AWS Glue crawler](https://docs.aws.amazon.com/glue/latest/dg/add-crawler.html), you can automatically create databases and tables from the patch compliance data in S3 and then query patch compliance data with [Amazon Athena](https://aws.amazon.com/athena/). This solution utilizes [Amazon QuickSight](https://aws.amazon.com/quicksight/) to visualize the inventory and patch compliance data, however, you can use any BI or analytics tool that can pull the data from the S3 bucket.
