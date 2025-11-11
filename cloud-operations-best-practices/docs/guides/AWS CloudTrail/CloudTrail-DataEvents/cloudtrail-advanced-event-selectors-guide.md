@@ -261,6 +261,7 @@ User identity selection allows you to include or exclude events for actions take
 
 For organization trails or Event Data Store (EDS) configurations, you can exclude entire accounts from S3 data event logging to reduce costs and focus on critical accounts. This selector excludes all S3 data events from a specific account by using the userIdentity.arn field to match any identity from that account. This approach is particularly useful for excluding development or testing accounts from comprehensive logging while maintaining coverage for production accounts.
 
+
 ```json
 [
   {
@@ -281,6 +282,10 @@ For organization trails or Event Data Store (EDS) configurations, you can exclud
   }
 ]
 ```
+
+:::info
+Please be aware that userIdentity ARN types may extend beyond the STS and IAM examples shown above. It is recommended to verify all userIdentity ARN types currently used within your organization.
+:::
 
 #### Multiple S3 Bucket Exclusion Selector
 
