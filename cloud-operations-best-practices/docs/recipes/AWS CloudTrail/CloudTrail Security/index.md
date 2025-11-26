@@ -22,7 +22,7 @@ This section provides comprehensive guidance on leveraging CloudTrail for securi
 - Log security and integrity protection measures
 - Anomaly detection with CloudTrail Insights
 
-**[Additional Security Resources](./additional-resources.mdx)**
+**[Additional Security Resources](../../../resources/cloudtrail-resources)**
 - Curated AWS blog posts for incident investigation, monitoring, and automation
 - Hands-on AWS CloudTrail security workshops for simulating real-world attack scenarios
 - Tools and scripts for automating CloudTrail analysis and incident response
@@ -39,4 +39,4 @@ This section provides comprehensive guidance on leveraging CloudTrail for securi
 
 Begin with understanding the [critical CloudTrail event fields](./event-fields.mdx) to build a foundation for effective security analysis. Then explore the [best practices](./best-practice-security-forensics.mdx) to implement comprehensive security monitoring in your environment.
 
-For hands-on experience, try the AWS workshops mentioned in our [additional resources](./additional-resources.mdx) section to practice detecting and responding to simulated security incidents.
+For hands-on experience, try the AWS workshops mentioned in our [additional resources](../../../resources/cloudtrail-resources) section to practice detecting and responding to simulated security incidents.
