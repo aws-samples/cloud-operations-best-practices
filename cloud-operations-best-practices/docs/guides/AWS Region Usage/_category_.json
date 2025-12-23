@@ -1,0 +1,8 @@
+{
+  "label": "AWS Region Usage",
+  "position": 5,
+  "link": {
+    "type": "doc",
+    "id": "guides/AWS Region Usage/index"
+  }
+}

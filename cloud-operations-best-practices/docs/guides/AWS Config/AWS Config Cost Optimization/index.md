@@ -1,7 +1,7 @@
 ---
-sidebar_position: 4
+sidebar_position: 6
 ---
-# AWS Config Cost Optimization
+# Cost Optimization
 
 ### Pricing
 

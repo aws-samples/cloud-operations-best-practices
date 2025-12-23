@@ -1,0 +1,8 @@
+{
+  "label": "AWS Control Tower",
+  "position": 3,
+  "link": {
+    "type": "doc",
+    "id": "guides/AWS Control Tower/index"
+  }
+}
