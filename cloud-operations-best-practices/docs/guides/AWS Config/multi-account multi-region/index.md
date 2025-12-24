@@ -1,7 +1,7 @@
 ---
 sidebar_position: 5
 ---
-# Multiple Account, Multiple Regions
+# Multiple Accounts, Multiple Regions
 
 ### **Recommended Architecture Pattern**
 For a typical enterprise setup:
@@ -27,7 +27,7 @@ AWS Config is an account- and region-specific service. For customers running mul
 3. **Using AWS Control Tower**:
     [AWS Control Tower](https://docs.aws.amazon.com/controltower/latest/userguide/what-is-control-tower.html) helps you set up and securely manage multiple AWS accounts from a central location. When enabled, Control Tower automatically activates AWS Config across all enrolled accounts. To get started with AWS Control Tower, refer to the [AWS Control Tower Getting Started documentation](https://docs.aws.amazon.com/controltower/latest/userguide/getting-started-with-control-tower.html).
 
-If you're in the early stage of your AWS adoption journey, we recommend starting with AWS Control Tower to establish a secure and compliant multi-account environment. Control Tower simplifies the setup process and ensures best practices are followed from the beginning. Visit the [AWS Control Tower page](../../AWS\ Control\ Tower/index.md) to learn AWS Control Tower best practices.
+If you're in the early stage of your AWS adoption journey, we recommend starting with AWS Control Tower to establish a secure and compliant multi-account environment. Control Tower simplifies the setup process and ensures best practices are followed from the beginning. Visit the [AWS Control Tower page](../../AWS%20Control%20Tower/index.md) to learn AWS Control Tower best practices.
 
 
 ### **Delegated Admin for AWS Config**
@@ -78,7 +78,7 @@ graph TD;
 
 #### **Primary Region**
 
-We recommend selecting a consistent *primary region* across your organization. The *primary region*, alternatively referred to as the *home region* or *aggregation region*, is the region where you deploy the AWS Config aggregator and other central services like the AWS Config delivery channel, Amazon S3 bucket for configuration snapshots, and Amazon SNS topic for notifications. Having a consistent *primary region* helps streamline your AWS cross-account, cross-region strategy. Refer to [AWS Prescriptive Guidance for multi-region fundamentals](https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-multi-region-fundamentals/fundamental-2.html) for general data considerations, and [AWS Region Usage](../../AWS\ Region\ Usage/index.md) for best practices on choosing your region strategy.
+We recommend selecting a consistent *primary region* across your organization. The *primary region*, alternatively referred to as the *home region* or *aggregation region*, is the region where you deploy the AWS Config aggregator and other central services like the AWS Config delivery channel, Amazon S3 bucket for configuration snapshots, and Amazon SNS topic for notifications. Having a consistent *primary region* helps streamline your AWS cross-account, cross-region strategy. Refer to [AWS Prescriptive Guidance for multi-region fundamentals](https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-multi-region-fundamentals/fundamental-2.html) for general data considerations, and [AWS Region Usage](../../AWS%20Region%20Usage/index.md) for best practices on choosing your region strategy.
 
 
 ### **Cross-Account Querying**
