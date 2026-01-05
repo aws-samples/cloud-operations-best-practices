@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Organizations using [AWS CloudTrail](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html) have three primary approaches for storing and monitoring their audit logs:
+Organizations using [AWS CloudTrail](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html) have three primary approaches for storing and monitoring their CloudTrail logs:
 
 1. **CloudTrail Trails**: Store logs in Amazon S3 buckets (with optional CloudWatch Logs integration)
 2. **CloudTrail Lake**: Store events in a managed data lake for advanced querying and analytics
@@ -18,7 +18,7 @@ Understanding the cost implications of moving from CloudTrail trails to direct C
 
 ## CloudTrail as a Data Source with CloudWatch Unified Data Store
 
-CloudTrail is a data source within the CloudWatch unified data store, providing data for security and operational analysis. The unified data store for CloudWatch Logs enables you to correlate CloudTrail data with other AWS and non-AWS logs using CloudWatch Log Insights, providing comprehensive visibility into your cloud infrastructure and security posture. 
+CloudTrail is a data source within the CloudWatch unified data store, providing data for security and operational analysis. The unified data store for CloudWatch Logs enables you to correlate CloudTrail data with other AWS and non-AWS logs using CloudWatch Log Insights, providing visibility into your cloud infrastructure and security posture. 
 
 ## Cost Analysis: Moving from Trails to CloudWatch Unified Data Store
 
