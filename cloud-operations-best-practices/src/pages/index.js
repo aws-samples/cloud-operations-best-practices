@@ -41,6 +41,12 @@ function HomepageHeader() {
           {siteConfig.title}
         </Heading>
         <p className="hero__subtitle">{siteConfig.tagline}</p>
+        <p style={{fontSize: '1.5rem'}}>
+          <a href="https://aws-experience.com/amer/smb/events/series/Cloud-Operations-Enablement"
+            style={{color: '#fff', fontWeight: 'bold', textDecoration: 'underline'}}>
+            📅 Register for AWS Cloud Operations Events
+          </a>
+        </p>
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
