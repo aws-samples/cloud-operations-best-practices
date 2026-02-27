@@ -9,12 +9,12 @@ The content on this site is maintained by Solution Architects, AWS service team 
 Recipes and content contributions in general so far are from the following
 people:
 
-| Authors             | Authors                     | Authors           | Authors            |
-| ------------------- | --------------------------- | ----------------- | ------------------ |
-| Isaiah Salinas      | Nereida Woo                 | Erik Weber        | Brad Gilomen       |
-| Justin Thomas       | Cheng-Lun Chen              | Steve Evernham    | Oscar Diaz         |
-| Caroline Johnston   | Mazzi Nabavi                | Jacky Fan         | Pal Patel          |
-| Jimmy Morgan        |                             |                   |                    |
+| Authors             | Authors                     | Authors              | Authors            |
+| ------------------- | --------------------------- | -------------------- | ------------------ |
+| Isaiah Salinas      | Nereida Woo                 | Erik Weber           | Brad Gilomen       |
+| Justin Thomas       | Cheng-Lun Chen              | Steve Evernham       | Oscar Diaz         |
+| Caroline Johnston   | Mazzi Nabavi                | Jacky Fan            | Pal Patel          |
+| Jimmy Morgan        | Pujah Goviel                | Gautam Bhaghavatula  | Rodolfo Brenes     |
 
 Note that all recipes published on this site are available via the
 [MIT-0][mit0] license, a modification to the usual MIT license
