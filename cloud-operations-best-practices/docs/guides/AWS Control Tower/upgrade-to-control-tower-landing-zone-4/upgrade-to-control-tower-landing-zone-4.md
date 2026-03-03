@@ -132,7 +132,7 @@ This section provides step-by-step guidance for upgrading your AWS Control Tower
 
 2. **Review the landing zone version**: Navigate to the Landing Zone settings page and verify your current version.
 
-![alt text](/img/guides/control-tower/upgrade/image.png)
+![Review the landing zone version](/img/guides/control-tower/upgrade/image.png)
 
 3. **Check for drift**: On the Landing Zone settings page, verify that your landing zone shows "No drift detected". If drift is detected, resolve it before proceeding. Accounts that are already in a drifted state before the upgrade may remain drifted after the upgrade and after OU re-registration, potentially requiring an AWS Support case to resolve.
 
@@ -147,25 +147,25 @@ You can upgrade to Landing Zone 4.0 using either the AWS Control Tower console o
 1. **Navigate to Landing Zone settings** in the AWS Control Tower console.
 
 2. Select the Landing Zone version 4.0 and **Click "Update"** button to begin the upgrade process.
-![Pastedimage20260219204716](/img/guides/control-tower/upgrade/Pastedimage20260219204716.png)
+![Upgrade via console](/img/guides/control-tower/upgrade/Pastedimage20260219204716.png)
 
 3. On the next page, confirm Landing zone version 4.0 is selected and optionally configure automatic account enrollment. Please note that after upgrade, it is not possible to go back to the previous version. Click Next.
-![Pastedimage20260219205257](/img/guides/control-tower/upgrade/Pastedimage20260219205257.png)
+![Landing zone version selection](/img/guides/control-tower/upgrade/Pastedimage20260219205257.png)
 
 4. Review your Governed Regions and Region deny control settings, then click Next
 
-![Pastedimage20260219205556](/img/guides/control-tower/upgrade/Pastedimage20260219205556.png)
+![Governed Regions ](/img/guides/control-tower/upgrade/Pastedimage20260219205556.png)
 5. This is the page where you can update "Service Integrations", then click Next
-![Pastedimage20260219205749](/img/guides/control-tower/upgrade/Pastedimage20260219205749.png)
-![Pastedimage20260219205825](/img/guides/control-tower/upgrade/Pastedimage20260219205825.png)
+![Service Integrations 1](/img/guides/control-tower/upgrade/Pastedimage20260219205749.png)
+![Service Integrations 2](/img/guides/control-tower/upgrade/Pastedimage20260219205825.png)
 
-![Pastedimage20260219205843](/img/guides/control-tower/upgrade/Pastedimage20260219205843.png)
+![Service Integrations 3](/img/guides/control-tower/upgrade/Pastedimage20260219205843.png)
 5. Review the Landing Zone settings and then **confirm the upgrade**: Click "Update landing zone" to begin the upgrade process.
 
-   ![Pastedimage20260219210023](/img/guides/control-tower/upgrade/Pastedimage20260219210023.png)
-![Pastedimage20260219210107](/img/guides/control-tower/upgrade/Pastedimage20260219210107.png)
+   ![Review and update](/img/guides/control-tower/upgrade/Pastedimage20260219210023.png)
+![Review Integration settings](/img/guides/control-tower/upgrade/Pastedimage20260219210107.png)
 
-![Pastedimage20260219210132](/img/guides/control-tower/upgrade/Pastedimage20260219210132.png)
+![Review Integration Settings](/img/guides/control-tower/upgrade/Pastedimage20260219210132.png)
 6. **Monitor the upgrade progress**: The upgrade process typically takes 30-60 minutes. You can monitor progress in the AWS Control Tower console.
 
 
@@ -173,7 +173,7 @@ You can upgrade to Landing Zone 4.0 using either the AWS Control Tower console o
 
 1. **Check landing zone status**: In the AWS Control Tower console, verify that the landing zone status shows "Active" and the version shows "4.0".
 
-   ![Pastedimage20260219210908](/img/guides/control-tower/upgrade/Pastedimage20260219210908.png)
+   ![Verify the upgrade completion](/img/guides/control-tower/upgrade/Pastedimage20260219210908.png)
 
 2. **Review service integrations**: Confirm that all previously enabled service integrations remain enabled and functional.
 
@@ -183,7 +183,7 @@ You can upgrade to Landing Zone 4.0 using either the AWS Control Tower console o
 
 - **New `ConfigBaseline` baseline:** There is now a separate `ConfigBaseline` at the OU level for detective controls support without requiring the comprehensive `AWSControlTowerBaseline`. See list of [baseline types at the OU level](https://docs.aws.amazon.com//controltower/latest/userguide/types-of-baselines.html#ou-baseline-types) for more information. For existing customers that are using the default landing zone, all service integrations are now optional, with the caveat of dependency requirements outlined in [Key changes](https://docs.aws.amazon.com/controltower/latest/userguide/key-changes-lz-v4.html).
 
-![Pastedimage20260219222252](/img/guides/control-tower/upgrade/Pastedimage20260219222252.png)
+![Verify base line](/img/guides/control-tower/upgrade/Pastedimage20260219222252.png)
 
 ### Step 5: Verify AWS Config changes
 
@@ -214,7 +214,7 @@ aws configservice describe-configuration-aggregators \
 
 You should see the aggregator `aws-controltower-ConfigAggregatorForOrganizations` in the audit account. Note that while this shares the same name as the legacy aggregator that was in the management account, it is a different resource deployed in a different account.
 
-![Pastedimage20260219215025](/img/guides/control-tower/upgrade/Pastedimage20260219215025.png)
+![Verify aggregator](/img/guides/control-tower/upgrade/Pastedimage20260219215025.png)
 
 #### Verify old aggregators are removed
 Confirm that the legacy aggregators have been removed:
@@ -253,7 +253,7 @@ aws s3 ls | grep aws-controltower-config-logs
 
 Expected bucket naming pattern: `aws-controltower-config-logs-<AUDIT_ACCOUNT>-<REGION_STRING>-<SUFFIX_STRING>`
 
-![Pastedimage20260219215231](/img/guides/control-tower/upgrade/Pastedimage20260219215231.png)
+![Verify AWS Config S3 bucket](/img/guides/control-tower/upgrade/Pastedimage20260219215231.png)
 
 > **Note**: Config data from member accounts may take up to 24 hours to appear in the new S3 bucket after the upgrade. Dashboards and compliance tools reading from S3 will show stale data during this window. For near-real-time data access, use the Config Aggregator API.
 
@@ -287,7 +287,7 @@ aws configservice describe-delivery-channels \
 
 The `s3BucketName` should reference the new `aws-controltower-config-logs-*` bucket.
 
-![Pastedimage20260219215431](/img/guides/control-tower/upgrade/Pastedimage20260219215431.png)
+![Verify AWS Config S3 bucket](/img/guides/control-tower/upgrade/Pastedimage20260219215431.png)
 
 If you have enrolled accounts with pre-existing Config delivery channels not created by Control Tower, you must manually update them to point to the new bucket:
 
@@ -365,7 +365,7 @@ Expected SNS topics in the Audit account:
 - `aws-controltower-AggregateSecurityNotifications` - Still exists but only for non-drift notifications
 - `aws-controltower-AggregateConfigurationNotifications` - Continues to work for compliance notifications
 
-![Pastedimage20260219211445](/img/guides/control-tower/upgrade/Pastedimage20260219211445.png)
+![Verify SNS Topics](/img/guides/control-tower/upgrade/Pastedimage20260219211445.png)
 
 For customers upgrading with `AWSControlTowerBaseline` enabled, the existing SNS topics and their subscriptions in the audit account are preserved and continue working unchanged. The primary change is for customers who later disable `AWSControlTowerBaseline` — in that case, drift notifications move from Amazon SNS to Amazon EventBridge in the management account.
 
