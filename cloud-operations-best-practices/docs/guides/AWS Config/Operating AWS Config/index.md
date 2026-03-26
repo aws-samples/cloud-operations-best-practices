@@ -8,12 +8,12 @@ sidebar_position: 1
 
 When configuring AWS Config recorder settings, an important best practice is to enable tracking for [all resource types](https://docs.aws.amazon.com/config/latest/developerguide/select-resources.html). The additional benefit of enabling all resources is the automatic inclusion of new AWS services resource types as they become available for Config tracking, ensuring your configuration management stays current without manual intervention.
 
-Regarding [global resources](https://docs.aws.amazon.com/config/latest/developerguide/select-resources.html#select-resources-global), such as [IAM](https://aws.amazon.com/iam/), it's important to enable recording in only one region (AWS Config should be enabled in the customer's home or main region). This configuration serves two purposes: it prevents duplicate configuration items and helps avoid unnecessary costs. If you enable global resource recording in multiple regions, you'll encounter redundant configuration tracking and incur additional expenses for monitoring the same global resources multiple times. For example, when tracking IAM users, roles, and policies, you should designate a primary region (such as us-east-1) for global resource recording and disable this feature in all other regions.
+Regarding [global resources](https://docs.aws.amazon.com/config/latest/developerguide/select-resources.html#select-resources-global), such as [AWS IAM](https://aws.amazon.com/iam/), it's important to enable recording in only one region (AWS Config should be enabled in the customer's home or main region). This configuration serves two purposes: it prevents duplicate configuration items and helps avoid unnecessary costs. If you enable global resource recording in multiple regions, you'll encounter redundant configuration tracking and incur additional expenses for monitoring the same global resources multiple times. For example, when tracking IAM users, roles, and policies, you should designate a primary region (such as us-east-1) for global resource recording and disable this feature in all other regions.
 
 
 #### Recorder Health Monitoring
 
-Monitor your AWS Config recorder health to ensure continuous compliance tracking. Use the `DescribeConfigurationRecorderStatus` API to programmatically check if your recorder is actively recording configuration changes and identify any error conditions. For automated monitoring, create CloudWatch alarms based on custom metrics that track recorder status across your accounts and regions. Additionally, configure SNS notifications through your Config delivery channel to receive alerts when configuration delivery fails. Regular monitoring helps maintain visibility into your resource configurations and ensures compliance evaluations continue without interruption.
+Monitor your AWS Config recorder health to ensure continuous compliance tracking. Use the `DescribeConfigurationRecorderStatus` API to programmatically check if your recorder is actively recording configuration changes and identify any error conditions. For automated monitoring, create Amazon CloudWatch alarms based on custom metrics that track recorder status across your accounts and regions. Additionally, configure Amazon SNS notifications through your Config delivery channel to receive alerts when configuration delivery fails. Regular monitoring helps maintain visibility into your resource configurations and ensures compliance evaluations continue without interruption.
 
 #### Environment-Specific Considerations
 
@@ -28,9 +28,9 @@ Align your Config settings with your organization's risk tolerance and complianc
 
 ### Delivery Method Best Practices
 
-When implementing AWS configuration management, establishing proper delivery methods for configuration items is crucial. A recommended best practice is to designate a centralized [Amazon S3 bucket](https://aws.amazon.com/pm/serv-s3/) within a central account, which could be either a logging account or another specifically designated account. This centralization allows for better organization and management of configuration item logs. To maintain clear organization within the bucket, it's advisable to implement a structured prefix system that clearly identifies the source account and region for each configuration item. Please also implement [security best practices for the S3 bucket](https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.htm) such as: enabling encryption in transit and at rest, disabling public access, and maintaining strict access controls. These security measures ensure compliance with data protection standards and minimize security risks. 
+When implementing AWS configuration management, establishing proper delivery methods for configuration items is crucial. A recommended best practice is to designate a centralized [Amazon S3 bucket](https://aws.amazon.com/pm/serv-s3/) within a central account, which could be either a logging account or another specifically designated account. This centralization allows for better organization and management of configuration item logs. To maintain clear organization within the bucket, it's advisable to implement a structured prefix system that clearly identifies the source account and region for each configuration item. Please also implement [security best practices for the S3 bucket](https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.htm) such as: enabling encryption in transit and at rest, disabling public access, and maintaining strict access controls. These security measures ensure compliance with data protection standards and minimize security risks.
 
-You can also configure AWS Config to automatically stream configuration changes and compliance status updates to a designated SNS topic. For enterprise environments with multiple AWS accounts, you establish a central SNS topic to consolidate these notifications. This centralized approach enables IT and Security teams to efficiently monitor and respond to configuration changes across the organization. To do so, [please follow this documentation](https://docs.aws.amazon.com/config/latest/developerguide/notifications-for-AWS-Config.html). 
+Configuration snapshots can be delayed up to 6 hours, and AWS Config provides best-effort delivery to S3. This is not suitable for real-time monitoring requirements. For real-time needs, we recommend that you configure AWS Config to automatically stream configuration changes and compliance status updates to a designated Amazon SNS topic. For enterprise environments with multiple AWS accounts, you establish a central Amazon SNS topic to consolidate these notifications. This centralized approach enables IT and Security teams to efficiently monitor and respond to configuration changes across the organization. To do so, [please follow this documentation](https://docs.aws.amazon.com/config/latest/developerguide/notifications-for-AWS-Config.html). 
 
 #### API vs Console Management
 
@@ -56,7 +56,7 @@ Monitor your quota usage through the [Service Quotas console](https://console.aw
 AWS Config integrates with various AWS services to provide comprehensive governance and compliance capabilities. Key integrations include:
 
 - **AWS Security Hub CSPM**: Centralizes security checks from AWS Config rules to verify resource configurations align with best practices (CIS, PCI-DSS, AWS Foundational Security Best Practices)
-- **AWS Control Tower**: Automatically enables Config on all enrolled accounts to monitor compliance through detective and proactive controls
+- **AWS Control Tower**: When AWS Config integration is enabled, deploys a service-linked Config recorder on enrolled accounts to monitor compliance through detective controls. AWS Config is an optional integration that must be explicitly enabled during or after landing zone setup.
 - **AWS CloudTrail**: Correlates configuration changes to specific events, providing details on who made changes, when, and from which IP address
 
 For a complete list of service integrations, see [AWS Service Integrations with AWS Config](https://docs.aws.amazon.com/config/latest/developerguide/service-integrations.html).
@@ -69,7 +69,7 @@ Coordinate with teams managing these services to avoid duplicate rules and ensur
 
 Implement automation to reduce manual overhead and ensure consistent Config management:
 
-- **Infrastructure as Code (IaC)**: Use CloudFormation, Terraform, or CDK to deploy Config resources
+- **Infrastructure as Code (IaC)**: Use AWS CloudFormation, Terraform, or AWS CDK to deploy Config resources
 - **CI/CD Integration**: Automate rule deployment and updates through pipelines
 - **Configuration Drift Detection**: Monitor and automatically remediate configuration drift
 - **Automated Reporting**: Generate compliance reports and dashboards automatically
@@ -78,15 +78,15 @@ Implement automation to reduce manual overhead and ensure consistent Config mana
 
 AWS Config integrates with various automation services for remediation:
 
-- **Systems Manager Automation**: Execute predefined runbooks for common remediation tasks
-- **Lambda Functions**: Implement custom remediation logic for complex scenarios
-- **EventBridge Integration**: Trigger automated responses to compliance violations
+- **AWS Systems Manager Automation**: Execute predefined runbooks for common remediation tasks
+- **AWS Lambda Functions**: Implement custom remediation logic for complex scenarios
+- **Amazon EventBridge Integration**: Trigger automated responses to compliance violations
 - **AWS Config Remediation**: Use built-in remediation actions for supported rules
 
 Consider implementing automated remediation for common issues while maintaining appropriate approval workflows for critical changes. Balance automation with human oversight based on the risk level of the remediation actions.
 
 ### Visual Dashboard
-[AWS Config configuration snapshot data](https://docs.aws.amazon.com/config/latest/developerguide/deliver-snapshot-cli.html) in S3 can be queried using [Amazon Athena](https://aws.amazon.com/athena/), and customers can create custom visualizations using [Amazon Quick Suite](https://aws.amazon.com/quicksuite/) or [Amazon Managed Grafana](https://aws.amazon.com/blogs/mt/exploring-aws-config-data-using-amazon-athena-and-amazon-managed-grafana/). 
+[AWS Config configuration snapshot data](https://docs.aws.amazon.com/config/latest/developerguide/deliver-snapshot-cli.html) in S3 can be queried using [Amazon Athena](https://aws.amazon.com/athena/), and customers can create custom visualizations using [Amazon Quick](https://aws.amazon.com/quick/) or [Amazon Managed Grafana](https://aws.amazon.com/blogs/mt/exploring-aws-config-data-using-amazon-athena-and-amazon-managed-grafana/). 
 
 We recommend establishing a single dashboard, consolidating data from all regions and resource types into a unified view. This approach provides a comprehensive overview of your organization's configuration state, simplifying monitoring and management tasks. For multi-account environments, consider creating a centralized dashboard in a dedicated analytics account. This central dashboard can pull data from multiple accounts, and multiple data sources in addition to AWS Config, offering a holistic view of the entire AWS environment's configuration and compliance status with the detail that you pull in. This centralized visibility is essential for maintaining consistent security policies and operational standards across the organization.
 

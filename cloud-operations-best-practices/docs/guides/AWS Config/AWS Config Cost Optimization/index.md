@@ -51,19 +51,27 @@ Use the blog post on [Best Practices for Analyzing AWS Config Recording Frequenc
 
 In general, your risk management process influences the AWS Config recording cost. As an example, if your sandbox environment is setup for 1 week retention and you have full lifecycle tactic and risk management process to ensure sandbox is destroyed in 1 week, your need to monitor environment can be more selective. However, if your sandbox has 1 week retention guidance and driven primary by user, your recording may be more granular. 
 
-Similarly, your recording approach can change if you have dedicated account and use-case defined for epehemral resources than if you have ephemeral resources alongside static resources for the same risk tolerance level. 
+Similarly, your recording approach can change if you have dedicated account and use-case defined for ephemeral resources than if you have ephemeral resources alongside static resources for the same risk tolerance level. 
 
 
 #### Resource Exclusion
 
-AWS Config [resource exclusion](https://docs.aws.amazon.com/config/latest/developerguide/select-resources.html) that can optimize AWS Config cost while maintaining essential security monitoring. Excluding resource types from recoder generates less Configuration Items, which optimize costs of running AWS Config. By excluding resource types, you also turn off continuous rule evaluation that can optimize cost.
+AWS Config [resource exclusion](https://docs.aws.amazon.com/config/latest/developerguide/select-resources.html) that can optimize AWS Config cost while maintaining essential security monitoring. Excluding resource types from recorder generates less Configuration Items, which optimize costs of running AWS Config. By excluding resource types, you also turn off continuous rule evaluation that can optimize cost.
 
 For detailed information on resource exclusion strategies and implementation, see the [Resource Exclusion section](../Resource%20Configuration%20Tracking/index.md#resource-exclusion) in Resource Configuration Tracking.
 
 
 #### Top Configuration Items
 
-The [AWS::Config::ResourceCompliance](https://docs.aws.amazon.com/config/latest/developerguide/view-compliance-history.html) resource type can be one of the most impactful configuration item generators, especially for customers with numerous rule evaluations. For detailed information on ResourceCompliance costs and CloudTrail alternatives, see the [API: ResourceCompliance section](../Resource%20Configuration%20Tracking/index.md#api-resourcecompliance) in Resource Configuration Tracking.
+The [AWS::Config::ResourceCompliance](https://docs.aws.amazon.com/config/latest/developerguide/view-compliance-history.html) resource type can be one of the most impactful configuration item generators, especially for customers with numerous rule evaluations. 
+
+**ResourceCompliance Cost Impact:**
+- **Cannot be disabled selectively**: ResourceCompliance recording is all-or-nothing. You cannot disable it for specific rules or resources.
+- **Generates CI for every evaluation**: Even if compliance status is unchanged, a new configuration item is created with each evaluation.
+- **No retention policy**: ResourceCompliance configuration items grow indefinitely unless you implement custom S3 lifecycle policies.
+- **Multiplier effect**: With 100 rules evaluating 1,000 resources daily, you generate 100,000 ResourceCompliance CIs per day (3M/month).
+
+For detailed information on ResourceCompliance costs and CloudTrail alternatives, see the [API: ResourceCompliance section](../Resource%20Configuration%20Tracking/index.md#api-resourcecompliance) in Resource Configuration Tracking.
 
 
 

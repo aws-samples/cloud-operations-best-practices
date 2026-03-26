@@ -26,17 +26,17 @@ Takes daily snapshots of your resource configurations, recording changes only wh
 - Highly dynamic resources (containers, auto-scaling groups)
 - Cost-sensitive implementations
 
-For detailed guidance on choosing the appropriate recording frequency, refer to the blog post on [Best Practices for Analyzing AWS Config Recording Frequencies](https://aws.amazon.com/blogs/mt/best-practices-for-analyzing-aws-config-recording-frequencies/).
+For detailed guidance on choosing the appropriate recording frequency, refer to the blog post on [Best Practices for Analyzing AWS Config Recording Frequencies](https://aws.amazon.com/blogs/mt/best-practices-for-analyzing-aws-config-recording-frequencies/). You can create one configuration recorder per region per account. The recorder can take a few minutes before configuration changes are captured again after stopping and restarting. Make changes to the configuration recorder during a maintenance window to account for the monitoring gap.
 
 ### Resource Exclusion
 
-AWS Config offers [resource exclusion](https://docs.aws.amazon.com/config/latest/developerguide/select-resources.html) capability, allowing organizations to strategically manage resources to monitor. By excluding specific resource types that are less relevant to your risk profile or those generating high volumes of configuration items, you can significantly optimize operational noise hile maintaining essential security monitoring.
+AWS Config offers [resource exclusion](https://docs.aws.amazon.com/config/latest/developerguide/select-resources.html) capability, allowing organizations to strategically manage resources to monitor. By excluding specific resource types that are less relevant to your risk profile or those generating high volumes of configuration items, you can significantly optimize operational noise while maintaining essential security monitoring.
 
 Resource exclusion affects inventory tracking and compliance monitoring. If your environment requires Config for compliance monitoring or detecting shadow IT, approach resource exclusion with careful consideration and proper stakeholder involvement. Organizations should engage their security and operations teams to conduct a thorough assessment of which resources are critical for monitoring and compliance requirements. Before implementing any exclusions, review [AWS's Security Best Practices](https://docs.aws.amazon.com/config/latest/developerguide/security-best-practices.html) and consult the [AWS Well-Architected Framework](https://aws.amazon.com/architecture/well-architected/).
 
 We recommend excluding resource types only when you have a pre-determined steps to monitor for noises in aggregation. That includes Use in conjunction with a solutions like [Innovation Sandbox](https://aws.amazon.com/solutions/implementations/innovation-sandbox-on-aws/) to recycle your accounts on predetermined frequency. 
 
-**Note**: [AWS Control Tower](https://aws.amazon.com/controltower/) managed config recorder requires customization following steps [outlined in this blog](https://aws.amazon.com/blogs/mt/customize-aws-config-resource-tracking-in-aws-control-tower-environment/). The blog contains ready-to-use template on Github to customize resource tracking configuration in Control Tower environments.
+**Note**: When AWS Config integration is enabled in [AWS Control Tower](https://aws.amazon.com/controltower/), a service-linked Config recorder is deployed that restricts modifications to resource types required by enabled controls. To customize resource tracking beyond these constraints, follow the steps [outlined in this blog](https://aws.amazon.com/blogs/mt/customize-aws-config-resource-tracking-in-aws-control-tower-environment/), which provides a ready-to-use template on GitHub.
 
 ### Using Relationships in Recorded JSON
 
@@ -59,7 +59,7 @@ For more details on analyzing relationships and optimizing recording frequencies
 
 The [AWS::Config::ResourceCompliance](https://docs.aws.amazon.com/config/latest/developerguide/view-compliance-history.html) resource type provides a timeline view of compliance status in the AWS Config console. While it offers valuable insights, it can significantly increase configuration item costs, particularly when evaluating large numbers of resources.
 
-For historical compliance checks, you can utilize CloudTrail data as a cost-free alternative. Use the following query with Athena, third-party solutions, or CloudTrail Lake:
+For historical compliance checks, you can utilize AWS CloudTrail data as a cost-free alternative. Use the following query with Amazon Athena, third-party solutions, or AWS CloudTrail Lake:
 
 ```sql
 SELECT
