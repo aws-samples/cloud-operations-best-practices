@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunkaws_cloud_operations_best_practices=globalThis.webpackChunkaws_cloud_operations_best_practices||[]).push([[3576],{7693(a){a.exports=JSON.parse('{"metadata":{"permalink":"/cloud-operations-best-practices/blog","page":1,"postsPerPage":10,"totalPages":1,"totalCount":0,"blogDescription":"Blog","blogTitle":"Blog"}}')}}]);
