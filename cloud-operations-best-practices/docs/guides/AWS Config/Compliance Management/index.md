@@ -65,6 +65,16 @@ Instead of deploying managed rules or custom rules individually to specific regi
 
 **Recommendation**: Deploy conformance packs from a delegated administrator account using organizational deployment APIs (`PutOrganizationConformancePack`). Use AWS-provided sample templates as a baseline and extend with custom rules for organization-specific requirements. Avoid deploying individual rules when a conformance pack can bundle them — this simplifies management and ensures immutable change control.
 
+#### Conformance Packs with Automated Remediation
+
+A conformance pack detects non-compliance but it does not resolve it. To close the loop, pair conformance pack rules with [AWS Systems Manager Automation runbooks](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-automation.html) that execute remediation actions automatically when a rule evaluates as `NON_COMPLIANT`. This pattern is deployed as a single conformance pack template that bundles both the rule definition and its corresponding remediation configuration, ensuring they are versioned and deployed together.
+
+In practice, this means the conformance pack YAML template includes `AWS::Config::RemediationConfiguration` resources alongside the rule definitions. When the pack is deployed via `PutOrganizationConformancePack`, both the detection and remediation logic propagate to every account and region in scope. This eliminates the operational gap where a rule flags a violation but no automated response exists which is a common failure mode in organizations that deploy rules and remediation separately.
+
+There are two operational considerations at scale. First, automatic remediation executes with the permissions of the SSM Automation execution role in the target account. Scope this role narrowly — a remediation runbook that re-enables S3 default encryption should not have permissions to modify IAM policies. Second, remediation actions generate their own CloudTrail events and can trigger downstream Config evaluations, creating evaluation loops if the remediation itself changes a tracked resource attribute. Test remediation actions in a sandbox account before enabling auto-remediation in production conformance packs. For a step-by-step implementation, refer to [Manage Custom AWS Config Rules with Remediation Using Conformance Packs](https://aws.amazon.com/blogs/mt/manage-custom-aws-config-rules-with-remediation-using-conformance-packs/).
+
+**Recommendation**: Bundle remediation configurations inside the conformance pack template rather than attaching them after deployment. This ensures detection and remediation are deployed atomically and cannot drift independently. Start with auto-remediation for deterministic, low-risk actions (e.g., enabling encryption, adding required tags) and use manual approval workflows for actions that modify network or identity configurations.
+
 
 ### AWS Config Rules Development Kit (RDK) 
 
