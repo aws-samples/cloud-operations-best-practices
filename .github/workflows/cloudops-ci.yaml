@@ -13,13 +13,12 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 20
-          cach: yarn
+          cache: yarn
       - name: Install dependencies
         run: yarn install --frozen-lockfile --non-interactive
       - name: Build
         run: |
           cd cloud-operations-best-practices
-          npm install aws-rum-web
           yarn install
           yarn build
       - uses: peaceiris/actions-gh-pages@v3
