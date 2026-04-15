@@ -14,12 +14,13 @@ jobs:
         with:
           node-version: 20
       - name: Install dependencies
-        run: yarn install --frozen-lockfile --non-interactive
+        run: |
+          cd cloud-operations-best-practices
+          npm ci
       - name: Build
         run: |
           cd cloud-operations-best-practices
-          yarn install
-          yarn build
+          npm run build
       - uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
