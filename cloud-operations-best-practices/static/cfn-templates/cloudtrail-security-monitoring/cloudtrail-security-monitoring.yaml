@@ -1,0 +1,938 @@
+#*
+#* Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#* SPDX-License-Identifier: MIT-0
+#*
+#* Permission is hereby granted, free of charge, to any person obtaining a copy of this
+#* software and associated documentation files (the "Software"), to deal in the Software
+#* without restriction, including without limitation the rights to use, copy, modify,
+#* merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+#* permit persons to whom the Software is furnished to do so.
+#*
+#* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+#* INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+#* PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+#* HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+#* OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+#* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#*
+
+#------------------------------------------------------------------------------
+#
+# Template: cloudtrail-security-monitoring.yaml
+# Purpose:  CloudFormation template to deploy real-time CloudTrail tampering
+#           detection and optional automated remediation resources.
+#
+# Resources Created:
+# * AWS KMS key and Alias for Amazon SNS topic encryption
+# * Amazon SNS Topic (AWS KMS-encrypted) and Topic Policy for alert delivery
+# * Amazon SNS Email Subscription
+# * CloudWatch Metric Filters for StopLogging, DeleteTrail, UpdateTrail
+# * CloudWatch Alarms for each metric filter
+# * EventBridge Rules for trail tampering and S3 bucket protection events
+# * IAM Managed Policy to protect monitoring resources from deletion
+# * IAM Managed Policy for Lambda execution permissions
+# * (Optional) Amazon Simple Queue Service (Amazon SQS) Dead Letter Queue for Lambda
+# * (Optional) Lambda Auto-Remediation Function and IAM Role
+# * (Optional) EventBridge Rule to invoke the Lambda function
+# * (Optional) S3 Bucket Policy to harden the CloudTrail log delivery bucket
+#
+# Threat Model Mitigations Implemented:
+# * StopLogging detection: EventBridge rule + CloudWatch alarm
+# * DeleteTrail detection: EventBridge rule + CloudWatch alarm
+# * UpdateTrail detection: EventBridge rule + CloudWatch alarm
+# * S3 bucket tampering detection: EventBridge S3 protection rule
+# * S3 bucket hardening: Deny policy on log bucket (optional)
+# * SNS enumeration prevention: Deny on sns:ListSubscriptionsByTopic
+# * SNS encryption at rest: AWS KMS key with rotation enabled
+# * Monitoring stack deletion prevention: IAM Managed Policy deny
+# * Lambda privilege escalation prevention: Trail-scoped least-privilege IAM
+# * Lambda input validation: Guard against malformed event structures
+# * AWS KMS key deletion prevention: Explicit Deny on kms:ScheduleKeyDeletion and kms:DisableKey
+# * Lambda dead letter queue: Capture failed invocations
+# * DLQ alarm: Alert when Lambda remediation failures accumulate
+# * S3 encryption enforcement: Deny unencrypted object uploads
+#
+# Prerequisites for the CloudTrail log S3 bucket (Customer Responsibility):
+# IMPORTANT: This template does NOT configure or validate these S3 bucket settings.
+# You MUST verify and configure all of the following before deployment:
+# * Block Public Access: all four settings enabled
+# * Server-side encryption: SSE-S3 or SSE-KMS configured
+# * Versioning: enabled — aws s3api get-bucket-versioning --bucket <bucket-name>
+# * Access logging: configured — aws s3api get-bucket-logging --bucket <bucket-name>
+# * MFA Delete: REQUIRED for production — requires root credentials
+#   aws s3api put-bucket-versioning --bucket <bucket-name> \
+#     --versioning-configuration Status=Enabled,MFADelete=Enabled \
+#     --mfa "arn:aws:iam::<account-id>:mfa/<device-name> <mfa-code>"
+# * Validate with AWS Config rules: s3-bucket-public-read-prohibited,
+#   s3-bucket-versioning-enabled, s3-bucket-logging-enabled
+#
+# Clean-up Steps:
+# 1. Delete the CloudFormation Stack
+# 2. Manually delete the retained SNS topic if no longer needed
+# 3. Manually delete the AWS KMS key alias and schedule key deletion if no longer needed
+#
+#------------------------------------------------------------------------------
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  AWS CloudFormation template to deploy real-time detection and optional
+  automated remediation for CloudTrail configuration tampering events using
+  CloudWatch metric filters, CloudWatch alarms, EventBridge rules, Amazon Simple Notification Service (Amazon SNS)
+  notifications (AWS KMS-encrypted), and an optional Lambda auto-remediation
+  function with dead letter queue.
+  Includes threat-model-driven mitigations for SNS enumeration, monitoring
+  stack deletion, S3 bucket hardening, Lambda privilege escalation, and
+  input validation. Prerequisites: the CloudTrail log S3 bucket must have
+  Block Public Access enabled, SSE encryption, versioning, and access logging.
+
+#-----------------------------------------------------------
+# Metadata
+#-----------------------------------------------------------
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: General
+        Parameters:
+          - CloudTrailLogGroupName
+          - NotificationEmail
+      - Label:
+          default: Detection
+        Parameters:
+          - TrailName
+      - Label:
+          default: Auto-Remediation
+        Parameters:
+          - EnableAutoRemediation
+      - Label:
+          default: S3 Log Bucket Protection
+        Parameters:
+          - CloudTrailLogBucketName
+    ParameterLabels:
+      CloudTrailLogGroupName:
+        default: CloudTrail Log Group Name
+      NotificationEmail:
+        default: Notification Email Address
+      TrailName:
+        default: CloudTrail Trail Name
+      EnableAutoRemediation:
+        default: Enable Auto-Remediation
+      CloudTrailLogBucketName:
+        default: CloudTrail Log S3 Bucket Name (optional)
+
+#-----------------------------------------------------------
+# Parameters
+#-----------------------------------------------------------
+Parameters:
+  CloudTrailLogGroupName:
+    Description: >-
+      Name of the CloudWatch Logs log group that receives CloudTrail events.
+      This log group must already exist and be configured as the CloudTrail
+      log group destination.
+    Type: String
+    AllowedPattern: '[\w\-\/\.]+'
+    ConstraintDescription: >-
+      Must be a valid CloudWatch Logs log group name containing only
+      alphanumeric characters, hyphens, underscores, forward slashes,
+      and periods. The log group must already exist.
+
+  NotificationEmail:
+    Description: >-
+      Email address that receives SNS alert notifications when CloudTrail
+      tampering events are detected. A subscription confirmation email is sent
+      to this address after stack creation.
+    Type: String
+    AllowedPattern: '^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$'
+    ConstraintDescription: >-
+      Must be a valid email address in the format user@example.com.
+
+  TrailName:
+    Description: >-
+      Name of the CloudTrail trail to protect. This value is used to scope
+      EventBridge rules and the optional auto-remediation function to the
+      specific trail.
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9\-_]+'
+    ConstraintDescription: >-
+      Must be a valid CloudTrail trail name containing only alphanumeric
+      characters, hyphens, and underscores.
+
+  EnableAutoRemediation:
+    Description: >-
+      Set to 'true' to create the Lambda auto-remediation function that
+      automatically calls StartLogging when a StopLogging event is detected.
+      Set to 'false' to deploy detection and alerting only.
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  CloudTrailLogBucketName:
+    Description: >-
+      Name of the existing S3 bucket that stores CloudTrail log files.
+      When provided, a hardening bucket policy is applied that denies
+      unauthorized deletion or modification of the bucket policy.
+      Leave empty to skip S3 bucket hardening.
+    Type: String
+    Default: ''
+
+#-----------------------------------------------------------
+# Conditions
+#-----------------------------------------------------------
+Conditions:
+  IsAutoRemediationEnabled: !Equals
+    - !Ref EnableAutoRemediation
+    - 'true'
+  HasCloudTrailLogBucket: !Not [!Equals [!Ref CloudTrailLogBucketName, '']]
+
+#-----------------------------------------------------------
+# Resources
+#-----------------------------------------------------------
+Resources:
+
+  #---------------------------------------------------------
+  # AWS KMS Key for Amazon SNS Topic Encryption
+  # Mitigation: Encryption at rest for alert notifications
+  # Threat: Information Disclosure — SNS message interception
+  #---------------------------------------------------------
+  AlertTopicKmsKey:
+    Type: AWS::KMS::Key
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      Description: !Sub 'AWS KMS key for CloudTrail security monitoring SNS topic - ${AWS::StackName}'
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowAccountRootFullAccess
+            # Resource: * is required in AWS KMS key policies. A key policy statement cannot
+            # reference its own ARN because the key does not exist yet when the policy is
+            # evaluated. This is an AWS architectural requirement for all AWS KMS key policies.
+            # See: https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:TagResource'
+              - 'kms:UntagResource'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+            Resource: '*'
+          - Sid: AllowSNSUse
+            # Resource: * is required — AWS KMS key policies cannot self-reference their own ARN.
+            # Access is scoped to Amazon SNS via kms:ViaService condition.
+            Effect: Allow
+            Principal:
+              Service: 'sns.amazonaws.com'
+            Action:
+              - 'kms:GenerateDataKey'
+              - 'kms:Decrypt'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'kms:ViaService': !Sub 'sns.${AWS::Region}.amazonaws.com'
+          - Sid: AllowCloudWatchUse
+            # Resource: * is required — AWS KMS key policies cannot self-reference their own ARN.
+            # Access is scoped to Amazon CloudWatch via kms:ViaService condition.
+            Effect: Allow
+            Principal:
+              Service: 'cloudwatch.amazonaws.com'
+            Action:
+              - 'kms:GenerateDataKey'
+              - 'kms:Decrypt'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'kms:ViaService': !Sub 'cloudwatch.${AWS::Region}.amazonaws.com'
+          - Sid: AllowEventBridgeUse
+            # Resource: * is required — AWS KMS key policies cannot self-reference their own ARN.
+            # Access is scoped to Amazon EventBridge via kms:ViaService condition.
+            Effect: Allow
+            Principal:
+              Service: 'events.amazonaws.com'
+            Action:
+              - 'kms:GenerateDataKey'
+              - 'kms:Decrypt'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'kms:ViaService': !Sub 'events.${AWS::Region}.amazonaws.com'
+          - Sid: DenyKeyDeletionToNonRoot
+            # Principal: * in this Deny statement applies the protection to all
+            # principals. The Condition restricts the denial to non-root principals only.
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:DisableKey'
+            Resource: !Sub 'arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/*'
+            Condition:
+              StringNotEquals:
+                'aws:PrincipalArn': !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+          - Sid: AllowCloudWatchLogsUse
+            # Resource: * is required — AWS KMS key policies cannot self-reference their own ARN.
+            # Access is scoped to the specific Lambda log group via kms:EncryptionContext condition.
+            Effect: Allow
+            Principal:
+              Service: !Sub 'logs.${AWS::Region}.amazonaws.com'
+            Action:
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey'
+              - 'kms:DescribeKey'
+            Resource: '*'
+            Condition:
+              ArnLike:
+                'kms:EncryptionContext:aws:logs:arn': !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/CloudTrailAutoRemediation-${AWS::StackName}'
+
+  AlertTopicKmsKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/cloudtrail-monitoring-sns-${AWS::StackName}'
+      TargetKeyId: !Ref AlertTopicKmsKey
+
+  #---------------------------------------------------------
+  # SNS Topic and Subscriptions
+  # Mitigation: DenySubscriptionEnumeration statement prevents
+  # non-root principals from enumerating security team email addresses
+  # (Threat: Information Disclosure — SNS subscription enumeration)
+  # AWS KMS encryption at rest via AlertTopicKmsKey
+  #---------------------------------------------------------
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TopicName: !Sub 'CloudTrailSecurityMonitoring-${AWS::StackName}'
+      KmsMasterKeyId: !Ref AlertTopicKmsKey
+      # SNS delivery status logging: tracks successful and failed message deliveries
+      # to CloudWatch Logs for audit and troubleshooting of CONFIDENTIAL alert data.
+      # Note: email protocol does not support delivery status logging directly;
+      # http/s logging is configured to capture any HTTP endpoint subscriptions added later.
+      DeliveryStatusLogging:
+        - Protocol: 'http/s'
+          SuccessFeedbackRoleArn: !GetAtt AlertTopicDeliveryLogRole.Arn
+          FailureFeedbackRoleArn: !GetAtt AlertTopicDeliveryLogRole.Arn
+          SuccessFeedbackSampleRate: '100'
+
+  #---------------------------------------------------------
+  # SNS Delivery Status Logging IAM Role
+  # Required to write delivery status logs to CloudWatch Logs
+  # for audit trail of CONFIDENTIAL security alert delivery.
+  #---------------------------------------------------------
+  AlertTopicDeliveryLogPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub 'CloudTrailSNSDeliveryLogPolicy-${AWS::StackName}'
+      Description: >-
+        Least-privilege policy for SNS delivery status logging to CloudWatch Logs.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+              - 'logs:PutMetricFilter'
+              - 'logs:PutRetentionPolicy'
+            Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:sns/${AWS::Region}/${AWS::AccountId}/CloudTrailSecurityMonitoring-${AWS::StackName}:*'
+
+  AlertTopicDeliveryLogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'CloudTrailSNSDeliveryLog-${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 'sns.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - !Ref AlertTopicDeliveryLogPolicy
+
+  AlertTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref AlertTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowOwningAccountManagement
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Action:
+              - 'sns:Publish'
+              - 'sns:Subscribe'
+              - 'sns:SetTopicAttributes'
+              - 'sns:GetTopicAttributes'
+              - 'sns:ListSubscriptionsByTopic'
+              - 'sns:DeleteTopic'
+              - 'sns:AddPermission'
+              - 'sns:RemovePermission'
+            Resource: !Ref AlertTopic
+          - Sid: AllowCloudWatchPublish
+            Effect: Allow
+            Principal:
+              Service: 'cloudwatch.amazonaws.com'
+            Action: 'sns:Publish'
+            Resource: !Ref AlertTopic
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref AWS::AccountId
+          - Sid: AllowEventBridgePublish
+            Effect: Allow
+            Principal:
+              Service: 'events.amazonaws.com'
+            Action: 'sns:Publish'
+            Resource: !Ref AlertTopic
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref AWS::AccountId
+          - Sid: DenySubscriptionEnumeration
+            # Principal: * in this Deny statement denies enumeration to all
+            # principals. The Condition restricts the denial to non-root principals only,
+            # protecting the security team email address from disclosure.
+            Effect: Deny
+            Principal: '*'
+            Action: 'sns:ListSubscriptionsByTopic'
+            Resource: !Ref AlertTopic
+            Condition:
+              StringNotEquals:
+                'aws:PrincipalArn': !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref NotificationEmail
+
+  #---------------------------------------------------------
+  # CloudWatch Metric Filters
+  #---------------------------------------------------------
+  StopLoggingMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref CloudTrailLogGroupName
+      FilterPattern: '{ ($.eventName = "StopLogging") }'
+      MetricTransformations:
+        - MetricName: StopLoggingCount
+          MetricNamespace: CloudTrailSecurityMonitoring
+          MetricValue: '1'
+          DefaultValue: 0
+
+  DeleteTrailMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref CloudTrailLogGroupName
+      FilterPattern: '{ ($.eventName = "DeleteTrail") }'
+      MetricTransformations:
+        - MetricName: DeleteTrailCount
+          MetricNamespace: CloudTrailSecurityMonitoring
+          MetricValue: '1'
+          DefaultValue: 0
+
+  UpdateTrailMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref CloudTrailLogGroupName
+      FilterPattern: '{ ($.eventName = "UpdateTrail") }'
+      MetricTransformations:
+        - MetricName: UpdateTrailCount
+          MetricNamespace: CloudTrailSecurityMonitoring
+          MetricValue: '1'
+          DefaultValue: 0
+
+  #---------------------------------------------------------
+  # CloudWatch Alarms
+  #---------------------------------------------------------
+  StopLoggingAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'CloudTrail-StopLogging-${AWS::StackName}'
+      AlarmDescription: 'Fires when a StopLogging API call is detected in CloudTrail logs.'
+      Namespace: CloudTrailSecurityMonitoring
+      MetricName: StopLoggingCount
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Statistic: Sum
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  DeleteTrailAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'CloudTrail-DeleteTrail-${AWS::StackName}'
+      AlarmDescription: 'Fires when a DeleteTrail API call is detected in CloudTrail logs.'
+      Namespace: CloudTrailSecurityMonitoring
+      MetricName: DeleteTrailCount
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Statistic: Sum
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  UpdateTrailAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'CloudTrail-UpdateTrail-${AWS::StackName}'
+      AlarmDescription: 'Fires when an UpdateTrail API call is detected in CloudTrail logs.'
+      Namespace: CloudTrailSecurityMonitoring
+      MetricName: UpdateTrailCount
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Statistic: Sum
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  #---------------------------------------------------------
+  # EventBridge Rules
+  #---------------------------------------------------------
+  TrailTamperingEventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'CT-Tampering-${AWS::StackName}'
+      Description: 'Detects CloudTrail tampering events: StopLogging, DeleteTrail, UpdateTrail.'
+      State: ENABLED
+      EventPattern:
+        source:
+          - 'aws.cloudtrail'
+        detail-type:
+          - 'AWS API Call via CloudTrail'
+        detail:
+          eventName:
+            - 'StopLogging'
+            - 'DeleteTrail'
+            - 'UpdateTrail'
+      Targets:
+        - Id: AlertTopicTarget
+          Arn: !Ref AlertTopic
+          InputTransformer:
+            InputPathsMap:
+              eventName: '$.detail.eventName'
+              eventTime: '$.detail.eventTime'
+              awsRegion: '$.detail.awsRegion'
+              account: '$.account'
+              sourceIPAddress: '$.detail.sourceIPAddress'
+              userName: '$.detail.userIdentity.userName'
+              userType: '$.detail.userIdentity.type'
+              userArn: '$.detail.userIdentity.arn'
+              trailName: '$.detail.requestParameters.name'
+            InputTemplate: |
+              "⚠️ CloudTrail Security Alert"
+              ""
+              "Event     : <eventName>"
+              "Trail     : <trailName>"
+              "Time      : <eventTime>"
+              "Region    : <awsRegion>"
+              "Account   : <account>"
+              ""
+              "Who triggered this:"
+              "  User     : <userName>"
+              "  Type     : <userType>"
+              "  ARN      : <userArn>"
+              "  Source IP: <sourceIPAddress>"
+              ""
+              "Action Required: Review this activity immediately and verify it was authorized."
+
+  S3ProtectionEventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'CT-S3Protection-${AWS::StackName}'
+      Description: 'Detects destructive S3 bucket operations on the CloudTrail log delivery bucket.'
+      State: ENABLED
+      EventPattern:
+        source:
+          - 'aws.s3'
+        detail-type:
+          - 'AWS API Call via CloudTrail'
+        detail:
+          eventName:
+            - 'DeleteBucket'
+            - 'DeleteBucketPolicy'
+            - 'PutBucketAcl'
+      Targets:
+        - Id: AlertTopicTarget
+          Arn: !Ref AlertTopic
+          InputTransformer:
+            InputPathsMap:
+              eventName: '$.detail.eventName'
+              eventTime: '$.detail.eventTime'
+              awsRegion: '$.detail.awsRegion'
+              account: '$.account'
+              sourceIPAddress: '$.detail.sourceIPAddress'
+              userName: '$.detail.userIdentity.userName'
+              userType: '$.detail.userIdentity.type'
+              userArn: '$.detail.userIdentity.arn'
+              bucketName: '$.detail.requestParameters.bucketName'
+            InputTemplate: |
+              "⚠️ CloudTrail S3 Bucket Protection Alert"
+              ""
+              "Event     : <eventName>"
+              "Bucket    : <bucketName>"
+              "Time      : <eventTime>"
+              "Region    : <awsRegion>"
+              "Account   : <account>"
+              ""
+              "Who triggered this:"
+              "  User     : <userName>"
+              "  Type     : <userType>"
+              "  ARN      : <userArn>"
+              "  Source IP: <sourceIPAddress>"
+              ""
+              "Action Required: Verify the CloudTrail log delivery bucket has not been compromised."
+
+  #---------------------------------------------------------
+  # Mitigation: Protect monitoring stack resources from deletion
+  # Threat: Denial of Service — deleting monitoring stack to disable detection
+  # Creates an IAM Managed Policy with Deny statements that prevent
+  # non-administrative principals from disabling or deleting the
+  # EventBridge rules, CloudWatch alarms, and metric filters.
+  # Attach this policy to all IAM roles/users in the account.
+  #---------------------------------------------------------
+  MonitoringStackProtectionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub 'CloudTrailMonitoringProtection-${AWS::StackName}'
+      Description: >-
+        Deny policy preventing non-administrative principals from deleting or
+        disabling the CloudTrail security monitoring stack resources. Attach to
+        IAM roles and users that should not be able to disable monitoring.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyMonitoringResourceDeletion
+            Effect: Deny
+            Action:
+              - 'events:DeleteRule'
+              - 'events:DisableRule'
+              - 'events:RemoveTargets'
+              - 'cloudwatch:DeleteAlarms'
+              - 'logs:DeleteMetricFilter'
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:rule/CT-Tampering-${AWS::StackName}'
+              - !Sub 'arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:rule/CT-S3Protection-${AWS::StackName}'
+              - !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:CloudTrail-StopLogging-${AWS::StackName}'
+              - !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:CloudTrail-DeleteTrail-${AWS::StackName}'
+              - !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:CloudTrail-UpdateTrail-${AWS::StackName}'
+              - !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:CloudTrail-AutoRemediationDLQ-${AWS::StackName}'
+
+  #---------------------------------------------------------
+  # Mitigation: S3 bucket policy hardening (conditional)
+  # Threat: S3 bucket policy tampering to block log delivery
+  # Applies a bucket policy that denies s3:DeleteBucketPolicy,
+  # s3:PutBucketAcl, and s3:DeleteBucket from non-root principals,
+  # and enforces HTTPS-only access to the log delivery bucket.
+  #---------------------------------------------------------
+  CloudTrailLogBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: HasCloudTrailLogBucket
+    Properties:
+      Bucket: !Ref CloudTrailLogBucketName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyBucketPolicyTampering
+            # Principal: * in Deny statements is intentional for comprehensive security
+            # enforcement. The Condition restricts the denial to non-root principals only.
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 's3:DeleteBucketPolicy'
+              - 's3:PutBucketAcl'
+              - 's3:DeleteBucket'
+            Resource: !Sub 'arn:${AWS::Partition}:s3:::${CloudTrailLogBucketName}'
+            Condition:
+              StringNotEquals:
+                'aws:PrincipalArn': !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+          - Sid: DenyInsecureTransport
+            # Principal: * enforces HTTPS access for all principals accessing the bucket.
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 's3:GetObject'
+              - 's3:PutObject'
+              - 's3:DeleteObject'
+              - 's3:ListBucket'
+              - 's3:GetBucketPolicy'
+              - 's3:PutBucketPolicy'
+              - 's3:DeleteBucketPolicy'
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:s3:::${CloudTrailLogBucketName}'
+              - !Sub 'arn:${AWS::Partition}:s3:::${CloudTrailLogBucketName}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+          - Sid: DenyAllInsecureTransport
+            # Action: s3:* in this Deny statement is intentional — it enforces HTTPS-only
+            # access for all S3 operations. Wildcard actions in Deny statements strengthen
+            # security posture and are an accepted pattern for bucket-wide TLS enforcement.
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:s3:::${CloudTrailLogBucketName}'
+              - !Sub 'arn:${AWS::Partition}:s3:::${CloudTrailLogBucketName}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+          - Sid: DenyUnencryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:${AWS::Partition}:s3:::${CloudTrailLogBucketName}/*'
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption':
+                  - 'AES256'
+                  # Require server-side encryption with AWS Key Management Service (AWS KMS) keys (SSE-KMS) or Amazon S3 managed keys (SSE-S3)
+                  - 'aws:kms'
+          - Sid: DenyDisableBlockPublicAccess
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutBucketPublicAccessBlock'
+            Resource: !Sub 'arn:${AWS::Partition}:s3:::${CloudTrailLogBucketName}'
+            Condition:
+              StringNotEquals:
+                'aws:PrincipalArn': !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+
+  #---------------------------------------------------------
+  # Lambda Auto-Remediation Resources (Conditional)
+  # Mitigation: Trail-scoped least-privilege IAM
+  # Threat: Lambda abuse for privilege escalation
+  # The IAM role grants cloudtrail:StartLogging only on the
+  # specific trail ARN — no wildcard resources.
+  #---------------------------------------------------------
+  AutoRemediationFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: IsAutoRemediationEnabled
+    Properties:
+      RoleName: !Sub 'CloudTrailAutoRemediation-${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - !Ref AutoRemediationFunctionPolicy
+
+  AutoRemediationFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: IsAutoRemediationEnabled
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/CloudTrailAutoRemediation-${AWS::StackName}'
+      RetentionInDays: 90
+      KmsKeyId: !GetAtt AlertTopicKmsKey.Arn
+
+  AutoRemediationFunctionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: IsAutoRemediationEnabled
+    Properties:
+      ManagedPolicyName: !Sub 'CloudTrailAutoRemediationPolicy-${AWS::StackName}'
+      Description: >-
+        Least-privilege policy for the CloudTrail auto-remediation Lambda function.
+        Scoped to the specific trail and Lambda log group.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowStartLogging
+            Effect: Allow
+            Action: 'cloudtrail:StartLogging'
+            Resource: !Sub 'arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/${TrailName}'
+          - Sid: AllowLogStreamAndEvents
+            Effect: Allow
+            Action:
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+            Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/CloudTrailAutoRemediation-${AWS::StackName}:*'
+          - Sid: AllowDLQSendMessage
+            Effect: Allow
+            Action: 'sqs:SendMessage'
+            Resource: !GetAtt AutoRemediationDLQ.Arn
+
+  AutoRemediationFunction:
+    Type: AWS::Lambda::Function
+    Condition: IsAutoRemediationEnabled
+    DependsOn: AutoRemediationFunctionLogGroup
+    Properties:
+      FunctionName: !Sub 'CloudTrailAutoRemediation-${AWS::StackName}'
+      Description: 'Automatically re-enables a CloudTrail trail when a StopLogging event is detected.'
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      Role: !GetAtt AutoRemediationFunctionRole.Arn
+      ReservedConcurrentExecutions: 5
+      # Note: VPC configuration is not required for this function as it only calls
+      # AWS CloudTrail service endpoints via AWS-managed network infrastructure.
+      # Adding VPC would require NAT Gateway for internet access to AWS APIs,
+      # increasing cost and complexity without security benefit for this use case.
+      DeadLetterConfig:
+        TargetArn: !GetAtt AutoRemediationDLQ.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import logging
+          import datetime
+          import re
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          # CloudTrail trail names: 3-128 chars, alphanumeric, hyphens, underscores.
+          # Also accepts full trail ARNs: arn:aws[*]:cloudtrail:<region>:<account>:trail/<name>
+          _TRAIL_NAME_RE = re.compile(
+              r'^(?:[a-zA-Z0-9\-_]{3,128}|arn:[a-zA-Z0-9\-]+:cloudtrail:[a-z0-9\-]+:\d{12}:trail/[a-zA-Z0-9\-_]{3,128})$'
+          )
+
+
+          def lambda_handler(event, context):
+              try:
+                  if 'detail' not in event or 'requestParameters' not in event.get('detail', {}):
+                      raise ValueError('Invalid event structure: missing required keys detail or requestParameters')
+                  trail_name = event['detail']['requestParameters']['name']
+                  if not trail_name:
+                      raise ValueError('Trail name extracted from event is empty.')
+                  if not _TRAIL_NAME_RE.match(trail_name):
+                      raise ValueError(f'Trail name contains invalid characters or invalid length: {trail_name!r}')
+                  logger.info('Starting auto-remediation for trail: %s', trail_name)
+                  client = boto3.client('cloudtrail')
+                  client.start_logging(Name=trail_name)
+                  timestamp = datetime.datetime.utcnow().isoformat()
+                  logger.info(
+                      'Successfully re-enabled CloudTrail logging. Trail: %s, Timestamp: %s',
+                      trail_name,
+                      timestamp,
+                  )
+                  return {'statusCode': 200, 'trailName': trail_name}
+              except Exception as exc:
+                  logger.error(
+                      'Failed to re-enable CloudTrail logging. Error type: %s, Details: %s',
+                      type(exc).__name__,
+                      str(exc),
+                  )
+                  raise
+
+  AutoRemediationDLQ:
+    Type: AWS::SQS::Queue
+    Condition: IsAutoRemediationEnabled
+    Properties:
+      QueueName: !Sub 'CloudTrailAutoRemediationDLQ-${AWS::StackName}'
+      MessageRetentionPeriod: 1209600
+      KmsMasterKeyId: !Ref AlertTopicKmsKey
+
+  #---------------------------------------------------------
+  # Mitigation: DLQ alarm to detect Lambda remediation failures
+  # Threat: Lambda concurrency exhaustion via repeated StopLogging
+  # Fires when failed Lambda invocations accumulate in the DLQ,
+  # indicating the auto-remediation is failing or being throttled.
+  #---------------------------------------------------------
+  AutoRemediationDLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsAutoRemediationEnabled
+    Properties:
+      AlarmName: !Sub 'CloudTrail-AutoRemediationDLQ-${AWS::StackName}'
+      AlarmDescription: >-
+        Fires when messages accumulate in the Lambda auto-remediation Dead Letter Queue.
+        This indicates that auto-remediation invocations are failing or being throttled.
+        Review Lambda logs and DLQ messages to investigate.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt AutoRemediationDLQ.QueueName
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Statistic: Sum
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  AutoRemediationEventBridgeRule:
+    Type: AWS::Events::Rule
+    Condition: IsAutoRemediationEnabled
+    Properties:
+      Name: !Sub 'CT-AutoRemediation-${AWS::StackName}'
+      Description: 'Invokes the auto-remediation Lambda function when a StopLogging event is detected.'
+      State: ENABLED
+      EventPattern:
+        source:
+          - 'aws.cloudtrail'
+        detail-type:
+          - 'AWS API Call via CloudTrail'
+        detail:
+          eventName:
+            - 'StopLogging'
+      Targets:
+        - Id: AutoRemediationFunctionTarget
+          Arn: !GetAtt AutoRemediationFunction.Arn
+
+  AutoRemediationLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Condition: IsAutoRemediationEnabled
+    Properties:
+      FunctionName: !GetAtt AutoRemediationFunction.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt AutoRemediationEventBridgeRule.Arn
+
+#-----------------------------------------------------------
+# Outputs
+#-----------------------------------------------------------
+Outputs:
+  AlertTopicArn:
+    Description: 'ARN of the SNS alert topic for CloudTrail security monitoring.'
+    Value: !Ref AlertTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertTopicArn'
+
+  MonitoringProtectionPolicyArn:
+    Description: >-
+      ARN of the IAM Managed Policy that prevents deletion of monitoring resources.
+      Attach this policy to IAM roles and users that should not be able to disable monitoring.
+    Value: !Ref MonitoringStackProtectionPolicy
+    Export:
+      Name: !Sub '${AWS::StackName}-MonitoringProtectionPolicyArn'
+
+  AutoRemediationFunctionArn:
+    Description: 'ARN of the Lambda auto-remediation function (only present when EnableAutoRemediation is true).'
+    Value: !If
+      - IsAutoRemediationEnabled
+      - !GetAtt AutoRemediationFunction.Arn
+      - !Ref AWS::NoValue
+
+  AutoRemediationDLQUrl:
+    Description: 'URL of the SQS Dead Letter Queue for failed Lambda invocations (only present when EnableAutoRemediation is true).'
+    Value: !If
+      - IsAutoRemediationEnabled
+      - !Ref AutoRemediationDLQ
+      - !Ref AWS::NoValue
