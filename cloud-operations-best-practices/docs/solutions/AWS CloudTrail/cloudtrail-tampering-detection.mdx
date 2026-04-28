@@ -41,25 +41,7 @@ Neither layer replaces the other. AWS Config gives you compliance history and dr
 
 The solution uses two parallel detection paths that both route to the same SNS topic, so your security team receives alerts from whichever layer fires first.
 
-```mermaid
-flowchart TD
-    CT[AWS CloudTrail] -->|Management events| CWL[CloudWatch Logs]
-    CT -->|Management events| EB[Amazon EventBridge]
-    S3[S3 Log Bucket] -->|Bucket events| EB
-
-    CWL -->|Metric filters| MF[Metric Filters\nStopLogging / DeleteTrail / UpdateTrail]
-    MF -->|Threshold breach| CWA[CloudWatch Alarms]
-    CWA -->|Alarm action| SNS[Amazon SNS Topic\nAWS KMS-encrypted]
-
-    EB -->|Trail tampering rule| SNS
-    EB -->|S3 protection rule| SNS
-    EB -->|StopLogging event| LF[Lambda Auto-Remediation\noptional]
-
-    LF -->|StartLogging| CT
-    LF -->|Failed invocations| DLQ[Amazon Simple Queue Service (Amazon SQS) Dead Letter Queue]
-
-    SNS -->|Email subscription| SEC[Security Team]
-```
+![CloudTrail Security Monitoring Architecture](/img/solutions/cloudtrail-security-monitoring/architecture-diagram.svg)
 
 ### CloudWatch Metric Filter and Alarm Layer
 
