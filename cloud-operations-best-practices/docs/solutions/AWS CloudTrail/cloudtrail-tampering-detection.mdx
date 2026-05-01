@@ -180,6 +180,12 @@ Before deploying this solution, verify the following are in place:
 :::warning Template Does Not Validate S3 Prerequisites
 The CloudFormation template does NOT validate these S3 bucket security settings. The stack deploys successfully even if prerequisites are not met, leaving your CloudTrail logs at risk. Verify all prerequisites using the AWS CLI commands above before deployment.
 :::
+
+For continuous enforcement after deployment, enable the following AWS Config managed rules to detect and alert if the bucket's security configuration degrades:
+- `s3-bucket-public-read-prohibited` — detects if Block Public Access is disabled
+- `s3-bucket-server-side-encryption-enabled` — detects if default encryption is removed
+- `s3-bucket-versioning-enabled` — detects if versioning is disabled
+- `s3-bucket-logging-enabled` — detects if access logging is removed
 - **AWS CLI** (optional) — For command-line deployment and the clean-up step.
 
 ## Implementation Priority
