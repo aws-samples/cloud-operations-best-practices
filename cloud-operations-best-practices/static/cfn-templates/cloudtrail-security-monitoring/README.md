@@ -220,15 +220,6 @@ The SNS topic is encrypted using a customer-managed AWS KMS key (`AlertTopicKmsK
 - Encrypt the CloudTrail log group in CloudWatch Logs using an AWS KMS key.
 - Use SSE-AWS KMS (not SSE-S3) on the CloudTrail log S3 bucket for stronger access control.
 
-## Testing
-
-```bash
-pip install -r tests/requirements-test.txt
-pytest tests/ -v
-```
-
-37 tests covering property-based tests (hypothesis), unit tests, and smoke tests for CFN and MDX structure.
-
 ## Clean Up
 
 ```bash
