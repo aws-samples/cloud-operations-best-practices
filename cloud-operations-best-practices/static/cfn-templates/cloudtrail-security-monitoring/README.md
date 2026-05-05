@@ -62,7 +62,6 @@ flowchart TD
 **Resources deployed:**
 - Amazon Simple Notification Service (Amazon SNS) topic with account-scoped topic policy (includes enumeration deny)
 - **AWS Key Management Service (AWS KMS) key for Amazon SNS topic encryption** (with automatic key rotation)
-- Amazon SNS delivery status logging role
 - 3 CloudWatch metric filters + alarms (StopLogging, DeleteTrail, UpdateTrail)
 - EventBridge rule for trail tampering events
 - EventBridge rule for S3 log bucket protection (DeleteBucket, DeleteBucketPolicy, PutBucketAcl)
@@ -220,32 +219,6 @@ The SNS topic is encrypted using a customer-managed AWS KMS key (`AlertTopicKmsK
 - Enable SSE on the SQS Dead Letter Queue using an AWS KMS key for production deployments.
 - Encrypt the CloudTrail log group in CloudWatch Logs using an AWS KMS key.
 - Use SSE-AWS KMS (not SSE-S3) on the CloudTrail log S3 bucket for stronger access control.
-
-## Threat Model
-
-A full threat model is available in `threat-model/cloudtrail-security-monitoring-final.md`.
-
-**9 threats identified and mitigated:**
-
-| Threat | Severity | Status |
-|---|---|---|
-| StopLogging to disable audit trail | High | Mitigated |
-| DeleteTrail to permanently eliminate audit capability | Critical | Mitigated (SCP recommended) |
-| S3 bucket policy tampering | High | Mitigated |
-| SNS subscription enumeration | Medium | Mitigated |
-| SNS message interception (at rest) | Medium | Mitigated (AWS KMS encryption) |
-| Monitoring stack deletion | High | Mitigated |
-| Lambda privilege escalation | High | Mitigated |
-| Lambda input validation bypass | Medium | Mitigated |
-| UpdateTrail to reduce audit scope | Medium | Mitigated |
-
-### Residual Risk: Trail Deletion Prevention
-
-This solution detects DeleteTrail events but cannot auto-restore a deleted trail. To prevent deletion, apply one of the following additional controls:
-
-- **AWS Service Control Policy (SCP)** — strongest control for AWS Organizations accounts
-- **IAM Permission Boundary** — for standalone accounts
-- **AWS Organizations trail** — architectural prevention; member accounts cannot delete org trails
 
 ## Testing
 
