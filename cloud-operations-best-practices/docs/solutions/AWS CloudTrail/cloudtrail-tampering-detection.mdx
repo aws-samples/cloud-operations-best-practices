@@ -427,8 +427,6 @@ Deploying this stack requires the following IAM permissions:
 | AWS KMS key deletion | High | AWS KMS key has `DeletionPolicy: Retain`; schedule deletion only after confirming no active use |
 | MFA Delete not enabled | Medium | Cannot be configured via CloudFormation — requires root account credentials. Enable manually after stack deployment: (1) Sign in with root account credentials, (2) obtain your root MFA device ARN from IAM console → Security credentials, (3) generate a current MFA code, then run: `aws s3api put-bucket-versioning --bucket <bucket> --versioning-configuration Status=Enabled,MFADelete=Enabled --mfa "<mfa-device-arn> <mfa-code>"`. Verify: `aws s3api get-bucket-versioning --bucket <bucket>` |
 
-For a complete threat analysis, refer to the threat model documentation included with this solution.
-
 ## Conclusion
 
 This solution adds a near real-time detection and automated response layer to your CloudTrail security posture. By combining CloudWatch metric filters and alarms with EventBridge rules, you get both durable metric history and fast event-driven alerting. The optional Lambda auto-remediation function minimizes the window during which logging is inactive, and the S3 bucket protection rules extend coverage to the log delivery bucket itself.
