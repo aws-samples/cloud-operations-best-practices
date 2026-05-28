@@ -17,8 +17,7 @@ AWS Config is a fully managed service providing resource inventory, configuratio
 This guide is organized to follow the typical customer journey:
 
 - **Setup and Operations**: Initial configuration, recorder settings, and operational best practices
-- **Environmental Condition**: Integration configuration with Control Tower and other services
+- **Multi-Account Management**: Enterprise-scale deployment, organizational conformance packs, and compliance evaluation
 - **Resource Configuration Tracking**: Recording strategies, resource types, and relationship management
 - **Compliance Management**: Rules and Packs strategies, custom rules and evaluation, and Systems Manager integration
-- **Multi-Account Management**: Enterprise-scale deployment, organizational conformance packs, and compliance evaluation
 - **Cost Optimization**: Cost analysis, optimization strategies, and efficiency improvements

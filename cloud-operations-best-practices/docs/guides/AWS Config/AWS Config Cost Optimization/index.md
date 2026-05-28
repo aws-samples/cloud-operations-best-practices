@@ -27,21 +27,19 @@ While the above are the primary pricing components, other factors can influence 
 
 
 
-### Configuration Item
-
-#### Analyzing Config Costs
+### Analyzing Config Costs
 
 [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/) provides insights into AWS Config costs by filtering service usage and analyzing cost dimensions.  To do so, navigate to your  [Billing and Cost Management console](https://us-east-1.console.aws.amazon.com/costmanagement/home#/home) and select **Cost Explorer** from left panel. From right panel, configure parameters such as your desired time and choose your preferred granularity based on the level of detail you need. Select **Usage Type** from **Dimensions** under **Group by** section. Under **Filters**, navigate to **Service** and choose **Config**.
 
 ![AWS Config Cost Visualization](/img/guides/config/configcost.png)
 
-[Amazon CloudWatch's](https://aws.amazon.com/cloudwatch/) "ConfigurationItemsRecorded" metric helps identify resource types generating the most configuration items. For detailed analysis, [Amazon Athena](https://aws.amazon.com/athena/) can be used to query [Cost and Usage Reports](https://aws.amazon.com/aws-cost-management/aws-cost-and-usage-reporting/) with [AWS CloudTrail](https://aws.amazon.com/cloudtrail/) and [CloudTrail Lake](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-lake.html) to help estimate config recorder costs and track frequently evaluated rules. Please refer to blog on how to [use Athena to Analyze AWS Config Data](https://aws.amazon.com/blogs/mt/use-amazon-athena-and-aws-cloudtrail-to-estimate-billing-for-aws-config-rule-evaluations/)
+[Amazon CloudWatch's](https://aws.amazon.com/cloudwatch/) "ConfigurationItemsRecorded" metric helps identify resource types generating the most configuration items. For detailed analysis, [Amazon Athena](https://aws.amazon.com/athena/) can be used to query [Cost and Usage Reports](https://aws.amazon.com/aws-cost-management/aws-cost-and-usage-reporting/) with [AWS CloudTrail](https://aws.amazon.com/cloudtrail/) to help estimate config recorder costs and track frequently evaluated rules. Please refer to blog on how to [use Athena to Analyze AWS Config Data](https://aws.amazon.com/blogs/mt/use-amazon-athena-and-aws-cloudtrail-to-estimate-billing-for-aws-config-rule-evaluations/)
 
 For cost alerts, implement proactive cost management through [AWS Budgets](https://aws.amazon.com/aws-cost-management/aws-budgets/) when costs exceed predefined thresholds.  Also, [AWS Cost Anomaly Detection](https://aws.amazon.com/aws-cost-management/aws-cost-anomaly-detection/) service provides continuous monitoring for unusual spending patterns, making it easier to identify and address cost spikes quickly. You can also create [CloudWatch billing alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/monitor_estimated_charges_with_cloudwatch.html) that notify you when your estimated charges exceed a defined threshold.  
 
-#### Choosing Between Continuous and Periodic Recording
+### Choosing Between Continuous and Periodic Recording
 
-The choice between continuous and periodic recording significantly impacts AWS Config costs. For comprehensive guidance on recording frequency options, use cases, and cost implications, see the [Recording Frequency section](../Resource%20Configuration%20Tracking/index.md#recording-frequency) in Resource Configuration Tracking.
+The choice between continuous and periodic recording significantly impacts AWS Config costs. For comprehensive guidance on recording frequency options, use cases, and cost implications, see the [Recording Frequency section](../Resource%20Configuration%20Tracking/#recording-frequency) in Resource Configuration Tracking.
 
 Key cost considerations:
 - **Continuous recording**: Can be more cost-effective for static workloads
@@ -54,42 +52,38 @@ In general, your risk management process influences the AWS Config recording cos
 Similarly, your recording approach can change if you have dedicated account and use-case defined for ephemeral resources than if you have ephemeral resources alongside static resources for the same risk tolerance level. 
 
 
-#### Resource Exclusion
+### Resource Exclusion
 
-AWS Config [resource exclusion](https://docs.aws.amazon.com/config/latest/developerguide/select-resources.html) that can optimize AWS Config cost while maintaining essential security monitoring. Excluding resource types from recorder generates less Configuration Items, which optimize costs of running AWS Config. By excluding resource types, you also turn off continuous rule evaluation that can optimize cost.
+AWS Config [resource exclusion](https://docs.aws.amazon.com/config/latest/developerguide/select-resources-excluding.html) is a feature that can optimize AWS Config cost while maintaining essential security monitoring. Excluding resource types from recorder generates less Configuration Items, which optimize costs of running AWS Config. By excluding resource types, you also turn off continuous rule evaluation that can optimize cost.
 
-For detailed information on resource exclusion strategies and implementation, see the [Resource Exclusion section](../Resource%20Configuration%20Tracking/index.md#resource-exclusion) in Resource Configuration Tracking.
+For detailed information on resource exclusion strategies and implementation, see the [Resource Exclusion section](../Resource%20Configuration%20Tracking/#resource-exclusion) in Resource Configuration Tracking.
 
 
-#### Top Configuration Items
+### Top Configuration Items
 
-The [AWS::Config::ResourceCompliance](https://docs.aws.amazon.com/config/latest/developerguide/view-compliance-history.html) resource type can be one of the most impactful configuration item generators, especially for customers with numerous rule evaluations. 
+The [AWS::Config::ResourceCompliance](https://docs.aws.amazon.com/config/latest/developerguide/view-manage-resource-console.html) resource type can be one of the most impactful configuration item generators in environments with active rule management or many rules evaluating each resource.
 
-**ResourceCompliance Cost Impact:**
-- **Cannot be disabled selectively**: ResourceCompliance recording is all-or-nothing. You cannot disable it for specific rules or resources.
-- **Generates CI for every evaluation**: Even if compliance status is unchanged, a new configuration item is created with each evaluation.
-- **No retention policy**: ResourceCompliance configuration items grow indefinitely unless you implement custom S3 lifecycle policies.
-- **Multiplier effect**: With 100 rules evaluating 1,000 resources daily, you generate 100,000 ResourceCompliance CIs per day (3M/month).
+ResourceCompliance recording can be enabled or disabled at the resource type level, but not per-rule or per-resource. And a new ResourceCompliance CI is recorded for a resource when at least one rule's compliance result changes for that resource. Stable resources that remain compliant across many evaluations do not generate continuous CIs. Each CI captures the full compliance state across all rules evaluating that resource.
 
-For detailed information on ResourceCompliance costs and CloudTrail alternatives, see the [API: ResourceCompliance section](../Resource%20Configuration%20Tracking/index.md#api-resourcecompliance) in Resource Configuration Tracking.
+For detailed information on ResourceCompliance costs and CloudTrail alternatives, see the [AWS::Config::ResourceCompliance section](../Resource%20Configuration%20Tracking/#awsconfigresourcecompliance) in Resource Configuration Tracking.
 
 
 
-#### AWS Config Indirect Relationship
+### AWS Config Indirect Relationship
 
-For detailed information on direct and indirect relationships and their cost implications, see the [Using Relationships in Recorded JSON section](../Resource%20Configuration%20Tracking/index.md#using-relationships-in-recorded-json) in Resource Configuration Tracking. Understanding these relationships is crucial for optimizing Config costs while maintaining necessary visibility into resource dependencies.
+For detailed information on direct and indirect relationships and their cost implications, see the [Using Relationships in Recorded JSON section](../Resource%20Configuration%20Tracking/#using-relationships-in-recorded-json) in Resource Configuration Tracking. Understanding these relationships is crucial for optimizing Config costs while maintaining necessary visibility into resource dependencies.
 
-#### Rule Management and Evaluation Considerations 
+### Rule Management and Evaluation Considerations 
 
-When managing rule lifecycles, deletions, and re-evaluations to minimize cost impact, see the [Rule Deletion Best Practices](../Compliance%20Management/index.md#rule-deletion-best-practices) and [Re-evaluation Strategies](../Compliance%20Management/index.md#re-evaluation-strategies) sections in Compliance Management.
+When managing rule lifecycles, deletions, and re-evaluations to minimize cost impact, see the [Rule Deletion Best Practices](../Compliance%20Management/#rule-deletion-best-practices) and [Re-evaluation Strategies](../Compliance%20Management/#re-evaluation-strategies) sections in Compliance Management.
 
-#### API Call Optimization 
+### API Call Optimization 
 
 Efficient API operations can reduce AWS Config costs. When modifying resources, such as adding multiple tags to an [EC2 instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html), it's recommended to consolidate changes into a single API call rather than making multiple individual calls. For example, adding 10 tags in one API call is more efficient than making 10 separate calls, as each call generates both an API change record and a resource compliance configuration item.
 
-#### Custom Rules and Lambda Function Optimization 
+### Custom Rules and Lambda Function Optimization 
 
-For custom rule implementation strategies, including Guard vs Lambda trade-offs and optimization techniques, see the [AWS CloudFormation Guard](../Compliance%20Management/index.md#aws-cloudformation-guard) and [Custom Evaluation](../Compliance%20Management/index.md#custom-evaluation) sections in Compliance Management.
+For custom rule implementation strategies, including Guard vs Lambda trade-offs and optimization techniques, see the [AWS CloudFormation Guard](../Compliance%20Management/#aws-cloudformation-guard) and [Custom Evaluation](../Compliance%20Management/#custom-evaluation) sections in Compliance Management.
 
 Key Considerations:
 * Narrowing the scope of evaluated resources using specific targeting. Scope based rules are only supported for event-based evaluations not periodic 
@@ -99,7 +93,7 @@ Key Considerations:
 
 #### Conformance Pack and Rule Deduplication 
 
-Regular auditing of rules and [conformance packs](https://docs.aws.amazon.com/config/latest/developerguide/conformance-packs.html) is essential to eliminate redundancy.  For instance, if multiple conformance packs include the same rule (such as CloudTrail enablement checks) that's already being evaluated by [AWS Security Hub](https://aws.amazon.com/security-hub/), consider removing the duplicate rules to avoid unnecessary evaluation costs. Review and consolidate overlapping rules across different compliance standards to maintain effectiveness while optimizing costs. Please follow [this blog to discover duplicate AWS Config rules](https://aws.amazon.com/blogs/security/discover-duplicate-aws-config-rules-for-streamlined-compliance/).
+Regular auditing of rules and [conformance packs](https://docs.aws.amazon.com/config/latest/developerguide/conformance-packs.html) is essential to eliminate redundancy.  For instance, if multiple conformance packs include the same rule (such as CloudTrail enablement checks) that's already being evaluated by [AWS Security Hub CSPM](https://aws.amazon.com/security-hub/), consider removing the duplicate rules to avoid unnecessary evaluation costs. Review and consolidate overlapping rules across different compliance standards to maintain effectiveness while optimizing costs. Please follow [this blog to discover duplicate AWS Config rules](https://aws.amazon.com/blogs/security/discover-duplicate-aws-config-rules-for-streamlined-compliance/).
 
 #### Optimizing Global Resource Recording in AWS Config
 
@@ -109,7 +103,7 @@ When implementing AWS Config across multiple regions, you can optimize the recor
 
 AWS Config interacts with various AWS services, each contributing to the overall cost. Key optimization strategies:
 
-- **Amazon S3**: Use S3 Intelligent-Tiering for Config delivery channel storage, implement lifecycle policies to transition configuration snapshots to IA after 30 days and Glacier after 90 days
+- **Amazon S3**: Use S3 Intelligent-Tiering for Config delivery channel storage, and implement lifecycle policies to transition configuration snapshots to cooler storage tiers (Infrequent Access, Glacier) as your retention and access requirements dictate
 - **Amazon SNS**: Optimize notification frequency and filter unnecessary alerts to reduce SNS costs
 - **AWS Lambda**: For custom rules, use efficient code and appropriate memory allocation to minimize execution costs
 - **Amazon CloudWatch**: Monitor Config-related metrics and set up cost-effective alerting thresholds

@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 2
 ---
 # Multiple Accounts, Multiple Regions
 
@@ -24,7 +24,7 @@ AWS Config is an account- and region-specific service. For customers running mul
      [AWS Systems Manager Quick Setup](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-quick-setup.html) offers a streamlined way to enable the Config recorder across your entire organization. To deploy AWS Config across your organization using AWS Systems Manager Quick Setup, [follow this blog](https://aws.amazon.com/blogs/mt/managing-configuration-compliance-across-your-organization-with-aws-systems-manager-quick-setup/).
 
 3. **Using AWS Control Tower**:
-    [AWS Control Tower](https://docs.aws.amazon.com/controltower/latest/userguide/what-is-control-tower.html) helps you set up and securely manage multiple AWS accounts from a central location. Starting with landing zone version 4.0, AWS Config is an optional integration that must be explicitly enabled during or after setup. When the AWS Config integration is enabled, AWS Control Tower deploys a service-linked Config recorder on enrolled accounts and a service-linked Config aggregator in the designated aggregator account. To get started with AWS Control Tower, refer to the [AWS Control Tower Getting Started documentation](https://docs.aws.amazon.com/controltower/latest/userguide/getting-started-with-control-tower.html).
+    [AWS Control Tower](https://docs.aws.amazon.com/controltower/latest/userguide/what-is-control-tower.html) helps you set up and securely manage multiple AWS accounts from a central location. Starting with landing zone version 4.0, AWS Config is an optional integration that must be explicitly enabled during or after setup. When the AWS Config integration is enabled, AWS Control Tower manages a customer-managed Config recorder on enrolled accounts which is protected from modification via SCP, and deploys a service-linked Config aggregator in the designated aggregator account. To get started with AWS Control Tower, refer to the [AWS Control Tower Getting Started documentation](https://docs.aws.amazon.com/controltower/latest/userguide/getting-started-with-control-tower.html).
 
 If you're in the early stage of your AWS adoption journey, we recommend starting with AWS Control Tower to establish a secure and compliant multi-account environment. AWS Control Tower simplifies the setup process and ensures best practices are followed from the beginning. Ensure you enable the AWS Config integration during landing zone setup to benefit from detective controls and resource configuration tracking. Visit the [AWS Control Tower page](../../AWS%20Control%20Tower/index.md) to learn AWS Control Tower best practices.
 
@@ -46,9 +46,9 @@ To use delegated admin for AWS Config operations and aggregation, [follow this b
 
 We recommend implementing organizational conformance packs for automatic deployment across your AWS Organization to establish a common baseline and consistent compliance standards. Conformance packs are integrated with AWS Organizations to deploy a collection of rules and actions as a single entity across an entire AWS Organization. Deploy conformance packs from the delegated administrator account. AWS CloudFormation StackSets can deploy stacks to new accounts added to the Organizations or organizational units (OUs). Refer to the [AWS CloudFormation User Guide](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-orgs-manage-auto-deployment.html) to learn more about the automatic deployment feature. 
 
-Organization conformance packs are deployed using the [AWS CLI](https://docs.aws.amazon.com/cli/latest/reference/configservice/index.html#cli-aws-configservice) or [AWS API](https://docs.aws.amazon.com/config/latest/APIReference/API_PutConformancePack.html). You can exclude accounts but not by OU, and deployment is region-specific. For that reason, we recommend establishing organization-wide controls first, then region-wide controls next. Failures in individual accounts don't block deployment to other accounts, potentially creating silent compliance gaps. Implement monitoring to detect failed deployments.
+Organization conformance packs are deployed using the [AWS CLI](https://docs.aws.amazon.com/cli/latest/reference/configservice/#cli-aws-configservice) or [AWS API](https://docs.aws.amazon.com/config/latest/APIReference/API_PutOrganizationConformancePack.html). You can exclude accounts but not by OU, and deployment is region-specific. For that reason, we recommend establishing organization-wide controls first, then region-wide controls next. Failures in individual accounts don't block deployment to other accounts, potentially creating silent compliance gaps. Implement monitoring to detect failed deployments.
 
-[Follow this blog](https://aws.amazon.com/blogs/mt/deploying-conformance-packs-across-an-organization-with-automatic-remediation/) to learn how to automate deployment. To learn more about conformance pack, visit the [Compliance Management section](../Compliance%20Management/index.md)
+[Follow this blog](https://aws.amazon.com/blogs/mt/deploying-conformance-packs-across-an-organization-with-automatic-remediation/) to learn how to automate deployment. To learn more about conformance pack, visit the [Compliance Management section](../Compliance%20Management/)
 
 ***Note***: Organizational deployment for new accounts is only retried for 7 hours after an account is added without an available recorder. If you haven't implemented a strategy to [enable AWS Config automatically](#enable-aws-config-across-all-accounts-in-multiple-regions), you need to enable the recorder in the account within 7 hours.
 
@@ -68,19 +68,15 @@ For rules evaluating global resources such as AWS IAM rules, deploy rules in one
 
 ### **Cross-Account, Cross-Region Aggregation**
 
-**Aggregator Limitations:**
-- Each aggregator supports a maximum of 10,000 source accounts. 
-- Maximum number of accounts in an AWS Organizations can be up to 50,000. 
-- By default, maximum 1,000 accounts can be added or deleted per week across all aggregators. 
-- Cannot create aggregator of aggregators.
+For current aggregator limits (including maximum source accounts per aggregator, accounts per organization, and weekly add/delete limits), see the [AWS Config service quotas documentation](https://docs.aws.amazon.com/config/latest/developerguide/configlimits.html). Note that aggregators cannot be nested (no aggregator of aggregators).
 
-For large Organizations structure or if you frequently churn AWS accounts, submit service quota increase to increase the limit for adding more than 1,000 accounts to aggregators. You will also need to create 5 aggregators to support 50,000 accounts, and define operational model for maintaining 5 aggregators. It's important to note that aggregated data can lag minutes behind source accounts. Plan monitoring and alerting strategies accordingly. We recommend one of the following approach.
+For organizations that exceed the per-aggregator account limit or frequently churn AWS accounts, submit a service quota increase request. If your organization size requires multiple aggregators, use AWS Lambda or AWS Step Functions to fan out queries across aggregators and merge results. It's important to note that aggregated data can lag minutes behind source accounts. Plan monitoring and alerting strategies accordingly. We recommend one of the following approaches.
 
 1. Central S3 + Amazon Athena - Use [centralized delivery channel](#central-delivery-channel-s3-bucket) and Amazon Athena to query across all Config data regardless of aggregator limit. Refer to [this blog](https://aws.amazon.com/blogs/mt/exploring-aws-config-data-using-amazon-athena-and-amazon-managed-grafana/) and [AWS Prescriptive Guidance](https://docs.aws.amazon.com/prescriptive-guidance/latest/patterns/automate-aws-resource-inventory.html)
 
-2. Build a query layer on top of 5 Aggregators - Split your organization into 5 AWS OU-based aggregators. Use AWS Lambda or AWS Step Functions to fan out queries to all 5 aggregators and merge the results. 
+2. Build a query layer on top of multiple Aggregators - Split your organization across OU-based aggregators. Use AWS Lambda or AWS Step Functions to fan out queries to all aggregators and merge the results. 
 
-3. Third-party tooling - Third-party tools like [Streampipe](https://steampipe.io/) can query multiple AWS accounts and aggregators simultaneously through unified SQL interface.
+3. Third-party tooling - Third-party tools like [Steampipe](https://steampipe.io/) can query multiple AWS accounts and aggregators simultaneously through unified SQL interface.
 
 #### **Aggregation Authorization**
 As organizations enable AWS Config across multiple regions and accounts, it becomes crucial to centralize the data for comprehensive visibility and management. [AWS Config Aggregators](https://docs.aws.amazon.com/config/latest/developerguide/aggregate-data.html) consolidate configuration-related data from various regions and accounts into a single, designated aggregator account at no additional cost. This centralization provides a unified view of your AWS environment, enabling easier monitoring of Config rule evaluations, conformance pack assessments, and overall compliance status across your organization. To deploy an organization-wide aggregator, [follow this blog](https://aws.amazon.com/blogs/mt/org-aggregator-delegated-admin/).
@@ -99,7 +95,7 @@ graph TD;
     click E "https://github.com/aws-samples/aws-control-tower-config-customization";
     click F "https://docs.aws.amazon.com/controltower/latest/userguide/config.html";
     click G "https://docs.aws.amazon.com/config/latest/developerguide/aggregated-create.html";
-    click H "(#enable-aws-config-across-all-accounts-in-multiple-regions)";
+    click H "#enable-aws-config-across-all-accounts-in-multiple-regions";
 ```
 
 #### **Central Delivery Channel S3 Bucket**
@@ -121,9 +117,9 @@ This aggregated data in the central account unlocks [advanced querying](https://
 
 #### **Centralized Compliance Across Services**
 
-At scale, AWS Config functions as the compliance data plane for multiple AWS services. AWS Control Tower consumes Config rule evaluations to enforce detective controls. AWS Security Hub ingests Config findings to produce a unified security posture score. AWS Audit Manager pulls Config evaluation results into audit-ready evidence folders. When these services are deployed independently without a deliberate integration strategy, organizations encounter duplicate rule evaluations, conflicting compliance states across dashboards, and unnecessary cost from redundant configuration items.
+At scale, AWS Config functions as the compliance data plane for multiple AWS services. AWS Control Tower consumes Config rule evaluations to enforce detective controls. AWS Security Hub CSPM ingests Config findings to produce a unified security posture score. AWS Config Conformance Packs bundle Config rules into compliance frameworks, providing a dashboard of resource-level compliance status and evidence in the form of configuration items that can be exported for audit purposes. When these services are deployed independently without a deliberate integration strategy, organizations encounter duplicate rule evaluations, conflicting compliance states across dashboards, and unnecessary cost from redundant configuration items.
 
-To avoid this, treat the delegated administrator account as the single pane of glass for compliance orchestration. Deploy Config rules through conformance packs at the organization level, feed evaluations into Security Hub via the service-linked integration, and map Security Hub findings to Audit Manager frameworks. This creates a unidirectional data flow — Config records the evaluation, Security Hub normalizes the finding, and Audit Manager packages it as evidence — with no circular dependencies or duplicate processing. For a detailed walkthrough of this integration pattern, refer to [Unlock the Power of AWS Config: Centralized Compliance and Resource Management](https://aws.amazon.com/blogs/mt/unlock-the-power-of-aws-config-centralized-compliance-and-resource-management/).
+To avoid this, treat the delegated administrator account as the single pane of glass for compliance orchestration. Deploy Config rules through conformance packs at the organization level, feed evaluations into Security Hub CSPM via the service-linked integration, and use the conformance pack dashboard to track compliance posture per framework. This creates a unidirectional data flow — Config records the evaluation, Security Hub CSPM normalizes the finding, and conformance pack dashboards surface the compliance posture per framework — with no circular dependencies or duplicate processing. For a detailed walkthrough of this integration pattern, refer to [Unlock the Power of AWS Config: Centralized Compliance and Resource Management](https://aws.amazon.com/blogs/mt/unlock-the-power-of-aws-config-centralized-compliance-and-resource-management/).
 
-**Recommendation**: Avoid enabling the same managed rule both as a standalone Config rule and as a Security Hub service-linked rule — this produces duplicate evaluations and inflates cost. Use Security Hub as the primary consumer of Config compliance data, and Audit Manager as the evidence layer. Establish a clear ownership model: the security team owns Security Hub findings, the compliance team owns Audit Manager frameworks, and the platform team owns the underlying Config rules and conformance packs.
+**Recommendation**: Avoid enabling the same managed rule both as a standalone Config rule and as a Security Hub CSPM service-linked rule — this produces duplicate evaluations and inflates cost. Use Security Hub CSPM as the primary consumer of Config compliance data, and conformance packs as the compliance framework and evidence layer. Establish a clear ownership model: the security team owns Security Hub CSPM findings, the compliance team owns conformance pack frameworks, and the platform team owns the underlying Config rules and conformance packs.
 

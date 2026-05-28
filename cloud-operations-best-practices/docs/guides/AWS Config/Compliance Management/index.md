@@ -7,13 +7,13 @@ AWS Config provides two primary types of rules for evaluating resource configura
 
 Custom rules can be created through AWS Lambda functions, where you code the logic that evaluates if your AWS resources are compliant or not. AWS Config also allows for the [creation of custom rules using Guard Custom policy](https://aws.amazon.com/blogs/mt/announcing-aws-config-custom-rules-using-guard-custom-policy/). [Guard Custom policy](https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config_develop-rules.html) simplify the process of creating custom rules as you won’t need to create Lambda functions. Guard Custom policy lets you define your policy-as-code to evaluate your resource against the policy that’s defined using the [Guard domain-specific language (DSL)](https://docs.aws.amazon.com/cfn-guard/latest/ug/writing-rules.html).
 
-AWS Config integrates natively with [AWS Systems Manager Automation documents](https://aws.amazon.com/blogs/mt/remediate-noncompliant-aws-config-rules-with-aws-systems-manager-automation-runbooks/) for remediation actions.  You can create your own custom remediation actions using AWS Systems Manager Automation documents and will have the option to choose manual or automatic remediation through AWS Config. 
+AWS Config integrates natively with [AWS Systems Manager Automation documents](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-automation.html) for remediation actions.  You can create your own custom remediation actions using AWS Systems Manager Automation documents and will have the option to choose manual or automatic remediation through AWS Config. 
 
-Additionally, AWS also provides [Service-Linked Rules](https://docs.aws.amazon.com/config/latest/developerguide/service-linked-rules.html), which are automatically created and managed by other AWS services to evaluate resource configurations specific to those services. For example, AWS Security Hub can create service-linked rules in AWS Config to evaluate security best practices and standards. You can also deploy [Organization Rules](https://docs.aws.amazon.com/config/latest/developerguide/config-rule-multi-account-deployment.html), which allow you to deploy and manage rules across multiple accounts in your AWS Organizations structure, making it easier to maintain consistent compliance across your entire AWS environment.
+Additionally, AWS provides [Service-Linked Rules](https://docs.aws.amazon.com/config/latest/developerguide/service-linked-awsconfig-rules.html), which are automatically created and managed by other AWS services to evaluate resource configurations specific to those services. For example, AWS Security Hub CSPM creates service-linked rules in AWS Config to evaluate security best practices and standards. You can also deploy [Organization Rules](https://docs.aws.amazon.com/config/latest/developerguide/config-rule-multi-account-deployment.html), which allow you to deploy and manage rules across multiple accounts in your AWS Organizations structure, making it easier to maintain consistent compliance across your entire AWS environment.
 
 ### Rule Trigger Types
 
-AWS Config rules use [trigger types](https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config_components.html) to determine when resources are evaluated for compliance. Understanding these triggers is essential for designing effective detection rules.
+AWS Config rules use [trigger types](https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config_components.html#evaluate-config_use-managed-rules-trigger) to determine when resources are evaluated for compliance. Understanding these triggers is essential for designing effective detection rules.
 
 #### Configuration Change-Triggered Rules
 AWS Config runs evaluations when a resource matching the rule's [scope](https://docs.aws.amazon.com/config/latest/APIReference/API_Scope.html) has a configuration change. The evaluation runs after AWS Config sends a configuration item change notification. You define which resources initiate the evaluation by setting the rule's scope, which can include:
@@ -37,11 +37,11 @@ For change-triggered rules, use the rule's scope to limit which resources trigge
 
 **Recommendation**: Use change-triggered rules as the default for compliance monitoring. Reserve periodic rules for checks that require time-based evaluation (e.g., certificate expiration, key rotation). Use the rule scope to target specific resource types or tag key/value combinations to reduce unnecessary evaluations and cost.
 
-### Conformance Packs vs Custom Rules
+### Conformance Packs and Custom Rules
 
-AWS Config regularly releases new managed rules to address emerging security, operational, and compliance requirements. Stay updated with the latest releases through the [AWS Config managed rules documentation](https://docs.aws.amazon.com/config/latest/developerguide/managed-rules-by-aws-config.html).
+AWS Config regularly releases new managed rules to address emerging security, operational, and compliance requirements. [AWS Config managed rules documentation](https://docs.aws.amazon.com/config/latest/developerguide/managed-rules-by-aws-config.html) lists all current managed rules. Stay updated with the latest releases through [AWS Config Document History](https://docs.aws.amazon.com/config/latest/developerguide/DocumentHistory.html). 
 
-When deciding between conformance packs and individual custom rules, consider the following:
+Conformance packs are a deployment and grouping mechanism that bundle rules including custom rules for consistent deployment across accounts and regions. Custom rules are an evaluation mechanism that define logics that determine compliance. Understanding when each is appropriate helps you design a maintainable compliance architecture.
 
 **Use Conformance Packs when:**
 - Implementing industry-standard compliance frameworks (HIPAA, NIST, PCI-DSS)
@@ -49,19 +49,21 @@ When deciding between conformance packs and individual custom rules, consider th
 - Requiring immutable rule sets with formal change control
 - Needing centralized deployment and management
 
+Ensure conformance packs don't become "keep the lights on" (KTLO) overhead by regularly reviewing and optimizing their contents. Remove redundant or obsolete rules to maintain efficiency.
+
 **Use Individual Custom Rules when:**
 - Implementing organization-specific requirements
 - Prototyping new compliance checks
 - Managing simple, standalone evaluations
 - Requiring frequent rule modifications
 
-Ensure conformance packs don't become "keep the lights on" (KTLO) overhead by regularly reviewing and optimizing their contents. Remove redundant or obsolete rules to maintain efficiency.
+Regularly audit standalone rules to identify those that are redundant, obsolete, or no longer evaluated against any in-scope resources. Rules left in place after their purpose has been served continue to count toward the 1,000-rule quota and generate ResourceCompliance CIs on every evaluation.
 
-**Recommendation**: Start with AWS-provided conformance pack templates aligned to your compliance framework. Customize by adding organization-specific custom rules. Use individual custom rules for prototyping and standalone checks that don't fit a broader compliance framework. Review conformance pack contents quarterly to remove rules that are no longer relevant or are duplicated by other services like AWS Security Hub.
+**Recommendation**: Start with AWS-provided conformance pack templates aligned to your compliance framework. Customize by adding organization-specific custom rules. Use individual custom rules for prototyping and standalone checks that don't fit a broader compliance framework. Review conformance pack contents quarterly to remove rules that are no longer relevant or are duplicated by other services like AWS Security Hub CSPM.
 
 ### Conformance Packs
 
-Instead of deploying managed rules or custom rules individually to specific regions and accounts, a best practice is to bundle them into [Conformance Packs](https://docs.aws.amazon.com/config/latest/developerguide/conformance-packs.html).  AWS Conformance Packs provide a single point of control to deploy and monitor hundreds of rules across multiple accounts and regions, ensuring consistent security and compliance standards at scale. They offer [pre-built templates for common frameworks](https://docs.aws.amazon.com/config/latest/developerguide/conformancepack-sample-templates.html) (like HIPAA, NIST, PCI-DSS) and allow custom rule creation, significantly reducing the time and effort needed for compliance management. These packs represent immutable groups of Config rules, ensuring that changes can only be made through formal updates to the conformance pack itself. This approach provides better governance and control over your compliance rules.
+Instead of deploying managed rules or custom rules individually to specific regions and accounts, a best practice is to bundle them into [Conformance Packs](https://docs.aws.amazon.com/config/latest/developerguide/conformance-packs.html).  AWS Conformance Packs provide a single point of control to deploy and monitor hundreds of rules across multiple accounts and regions, ensuring consistent security and compliance standards at scale. AWS Config offers [pre-built templates for common frameworks](https://docs.aws.amazon.com/config/latest/developerguide/conformancepack-sample-templates.html) (like HIPAA, NIST, PCI-DSS) and allow custom rule creation, significantly reducing the time and effort needed for compliance management. These packs represent immutable groups of Config rules, ensuring that changes can only be made through formal updates to the conformance pack itself. This approach provides better governance and control over your compliance rules.
 
 **Recommendation**: Deploy conformance packs from a delegated administrator account using organizational deployment APIs (`PutOrganizationConformancePack`). Use AWS-provided sample templates as a baseline and extend with custom rules for organization-specific requirements. Avoid deploying individual rules when a conformance pack can bundle them — this simplifies management and ensures immutable change control.
 
@@ -106,6 +108,8 @@ Guard uses a domain-specific language (DSL) to define policies that evaluate res
 - Operational best practice enforcement
 
 **Recommendation**: Default to Guard for new custom rules unless your evaluation logic requires API calls to other AWS services or complex computation that Guard's DSL cannot express. Guard rules have no Lambda execution charges, no cold start latency, and are easier to read and maintain than Lambda function code.
+
+For further troubleshooting of Guard-based custom rules, enable debug log delivery to Amazon CloudWatch Logs using the **Enable debug logs** option in the AWS Config console when adding or editing a rule, or by setting `EnableDebugLogDelivery: true` via the `put-config-rule` CLI command or `PutConfigRule` API. This flag defaults to `false` and must be set per-rule. See [Creating Custom Policy Rules](https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config_develop-rules_cfn-guard.html) for details.
 
 ### Custom Evaluation
 
@@ -166,7 +170,7 @@ This sequential process helps prevent unnecessary spikes in configuration item g
 AWS Config offers five fixed intervals: 1 hour, 3 hours, 6 hours, 12 hours, or 24 hours. There is no sub-hourly option and no custom interval. If your compliance requirement demands near-real-time evaluation, use event-based (configuration change) triggers instead. When a resource undergoes rapid successive changes (e.g., an Auto Scaling group scaling from 2 to 50 instances in minutes), AWS Config may consolidate changes and only evaluate the final state. This means intermediate non-compliant states can go undetected. This is particularly relevant for ephemeral workloads like containers, spot instances, and CI/CD pipelines.
 
 #### Remediation Integration
-AWS Config integrates natively with [AWS Systems Manager Automation documents](https://aws.amazon.com/blogs/mt/remediate-noncompliant-aws-config-rules-with-aws-systems-manager-automation-runbooks/) for remediation actions. You can create custom remediation actions and choose between manual or automatic remediation through AWS Config. Consider implementing automated remediation for:
+AWS Config integrates natively with [AWS Systems Manager Automation documents](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-automation.html) for remediation actions. You can create custom remediation actions and choose between manual or automatic remediation through AWS Config. Consider implementing automated remediation for:
 - Common security misconfigurations
 - Cost optimization opportunities
 - Operational best practice violations

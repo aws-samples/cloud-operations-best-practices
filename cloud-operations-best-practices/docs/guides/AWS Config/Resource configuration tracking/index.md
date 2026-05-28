@@ -26,17 +26,17 @@ Takes daily snapshots of your resource configurations, recording changes only wh
 - Highly dynamic resources (containers, auto-scaling groups)
 - Cost-sensitive implementations
 
-For detailed guidance on choosing the appropriate recording frequency, refer to the blog post on [Best Practices for Analyzing AWS Config Recording Frequencies](https://aws.amazon.com/blogs/mt/best-practices-for-analyzing-aws-config-recording-frequencies/). You can create one configuration recorder per region per account. The recorder can take a few minutes before configuration changes are captured again after stopping and restarting. Make changes to the configuration recorder during a maintenance window to account for the monitoring gap.
+For detailed guidance on choosing the appropriate recording frequency, refer to the blog post on [Best Practices for Analyzing AWS Config Recording Frequencies](https://aws.amazon.com/blogs/mt/best-practices-for-analyzing-aws-config-recording-frequencies/). You can create one customer-managed configuration recorder per region per account. The recorder can take a few minutes before configuration changes are captured again after stopping and restarting. Make changes to the configuration recorder during a maintenance window to account for the monitoring gap.
 
 ### Resource Exclusion
 
-AWS Config offers [resource exclusion](https://docs.aws.amazon.com/config/latest/developerguide/select-resources.html) capability, allowing organizations to strategically manage resources to monitor. By excluding specific resource types that are less relevant to your risk profile or those generating high volumes of configuration items, you can significantly optimize operational noise while maintaining essential security monitoring.
+AWS Config offers [resource exclusion](https://docs.aws.amazon.com/config/latest/developerguide/select-resources-excluding.html) capability, allowing organizations to strategically manage resources to monitor. By excluding specific resource types that are less relevant to your risk profile or those generating high volumes of configuration items, you can significantly optimize operational noise while maintaining essential security monitoring.
 
 Resource exclusion affects inventory tracking and compliance monitoring. If your environment requires Config for compliance monitoring or detecting shadow IT, approach resource exclusion with careful consideration and proper stakeholder involvement. Organizations should engage their security and operations teams to conduct a thorough assessment of which resources are critical for monitoring and compliance requirements. Before implementing any exclusions, review [AWS's Security Best Practices](https://docs.aws.amazon.com/config/latest/developerguide/security-best-practices.html) and consult the [AWS Well-Architected Framework](https://aws.amazon.com/architecture/well-architected/).
 
-We recommend excluding resource types only when you have a pre-determined steps to monitor for noises in aggregation. That includes Use in conjunction with a solutions like [Innovation Sandbox](https://aws.amazon.com/solutions/implementations/innovation-sandbox-on-aws/) to recycle your accounts on predetermined frequency. 
+We recommend excluding resource types only when you have a pre-determined steps to monitor for noises in aggregation. Use in conjunction with a solutions like [Innovation Sandbox](https://aws.amazon.com/solutions/implementations/innovation-sandbox-on-aws/) to recycle your accounts on predetermined frequency. 
 
-**Note**: When AWS Config integration is enabled in [AWS Control Tower](https://aws.amazon.com/controltower/), a service-linked Config recorder is deployed that restricts modifications to resource types required by enabled controls. To customize resource tracking beyond these constraints, follow the steps [outlined in this blog](https://aws.amazon.com/blogs/mt/customize-aws-config-resource-tracking-in-aws-control-tower-environment/), which provides a ready-to-use template on GitHub.
+**Note**: When AWS Config integration is enabled in [AWS Control Tower](https://aws.amazon.com/controltower/), AWS Control Tower manages a customer-managed Config recorder on enrolled accounts which is protected from modification via SCP. Control Tower account and landing zone lifecycle events (e.g., updates to managed accounts, landing zone updates) reset the recorder configuration via the underlying CloudFormation StackSet, overwriting any exclusions you applied directly. To persist exclusions in Control Tower environments, deploy the [EventBridge + Lambda re-application architecture](https://aws.amazon.com/blogs/mt/customize-aws-config-resource-tracking-in-aws-control-tower-environment/) that listens for lifecycle events and re-applies your desired recorder configuration. The [GitHub repository](https://github.com/aws-samples/aws-control-tower-config-customization) provides a ready-to-use template. Verify that exclusions don't disable resource types required by Control Tower's detective controls in any enrolled account.
 
 ### Using Relationships in Recorded JSON
 
@@ -51,15 +51,15 @@ AWS Config captures resource relationships in the configuration item JSON, provi
 - Older resource types might have their configuration recorded by examining multiple resources configurations
 - Example: The relationship between a security group and an Amazon EC2 instance is indirect because describing a security group does not return any information about the instances it is associated with. In this case AWS Config creates two configuration items
 
-You can learn more about what resources support indirect relationships [in this documentation](https://docs.aws.amazon.com/config/latest/developerguide/faq.html). To opt out of indirect relationships for cost optimization, reach out to your [Technical Account Manager](https://aws.amazon.com/premiumsupport/plans/enterprise/).
+You can learn more about what resources support indirect relationships and how to disable them [in the AWS Config FAQ](https://docs.aws.amazon.com/config/latest/developerguide/faq.html). Disabling indirect relationships requires opening an AWS Support case — the FAQ provides the exact steps. Note that indirect relationships are being deprecated for new resource types; only the legacy EC2 resource types listed in the FAQ continue to generate indirect CIs.
 
-For more details on analyzing relationships and optimizing recording frequencies, see the blog post on [Best Practices for Analyzing AWS Config Recording Frequencies](https://aws.amazon.com/blogs/mt/best-practices-for-analyzing-aws-config-recording-frequencies/).
+For details on how many CIs are generated per relationship type and when they are triggered, see the [AWS Config FAQ on indirect relationships](https://docs.aws.amazon.com/config/latest/developerguide/faq.html#config-recording) and the [Best Practices for Analyzing AWS Config Recording Frequencies](https://aws.amazon.com/blogs/mt/best-practices-for-analyzing-aws-config-recording-frequencies/) blog post.
 
-### API: ResourceCompliance
+### AWS::Config::ResourceCompliance
 
 The [AWS::Config::ResourceCompliance](https://docs.aws.amazon.com/config/latest/developerguide/view-compliance-history.html) resource type provides a timeline view of compliance status in the AWS Config console. While it offers valuable insights, it can significantly increase configuration item costs, particularly when evaluating large numbers of resources.
 
-For historical compliance checks, you can utilize AWS CloudTrail data as a cost-free alternative. Use the following query with Amazon Athena, third-party solutions, or AWS CloudTrail Lake:
+For historical compliance checks, you can utilize AWS CloudTrail data as a cost-free alternative. Query CloudTrail logs delivered to Amazon S3 using Amazon Athena, ingest them into Amazon CloudWatch, or third-party solutions. The following query is a sample Athena query:
 
 ```sql
 SELECT
@@ -68,12 +68,14 @@ SELECT
     json_extract_scalar(json_array_get(element_at(requestParameters,'evaluations'), 0), '$.complianceType') as Compliance,
     json_extract_scalar(json_array_get(element_at(requestParameters,'evaluations'), 0), '$.complianceResourceType') as ResourceType,
     json_extract_scalar(json_array_get(element_at(requestParameters,'evaluations'), 0), '$.complianceResourceId') as ResourceName
-FROM $EDS_ID
+FROM your_cloudtrail_athena_table
 WHERE eventName='PutEvaluations'
     AND eventTime > '2022-03-17 00:00:00'
     AND eventTime < '2022-03-18 00:00:00'
     AND json_extract_scalar(json_array_get(element_at(requestParameters,'evaluations'), 0), '$.complianceType') IN ('COMPLIANT','NON_COMPLIANT')
 ```
+
+> **Note:** Replace `your_cloudtrail_athena_table` with your Athena table name pointing to your CloudTrail S3 delivery bucket.
 
 ### Resource Type Coverage
 
