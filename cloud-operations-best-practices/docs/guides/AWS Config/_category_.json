@@ -1,8 +1,0 @@
-{
-  "label": "AWS Config",
-  "position": 2,
-  "link": {
-    "type": "doc",
-    "id": "guides/AWS Config/index"
-  }
-}
