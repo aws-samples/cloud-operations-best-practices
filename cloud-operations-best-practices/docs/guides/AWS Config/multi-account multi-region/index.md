@@ -83,20 +83,9 @@ As organizations enable AWS Config across multiple regions and accounts, it beco
 
 Authorization refers to the permissions you grant to an aggregator account and region to collect your AWS Config configuration and compliance data. To set up cross-account, cross-region aggregation, we recommend you delegate authorization to an automated service. When AWS Config integration is enabled, AWS Control Tower deploys a service-linked Config aggregator (SLCA) in the designated aggregator account, which can aggregate data from any Config recorder in the organization — including accounts not managed by AWS Control Tower. This replaces the organization and account aggregators used in earlier landing zone versions. Without AWS Control Tower, we recommend organization-based authorization to eliminate overhead managing individual authorization accounts.
 
-```mermaid
-graph TD;
-    A[Start] --> B{Control Tower enabled?};
-    B -->|Yes| C{Do you have standalone accounts?};
-    B -->|No| D{Organizations enabled?}
-    C -->|Yes| E[Use service-linked Config aggregator + self-managed StackSet for standalone accounts#dagger;];
-    C -->|No| F[Use service-linked Config aggregator#dagger; ];
-    D -->|Yes| G[Use organization-based authorization#dagger;];
-    D -->|No| H[Establish self-managed StackSet#dagger;];
-    click E "https://github.com/aws-samples/aws-control-tower-config-customization";
-    click F "https://docs.aws.amazon.com/controltower/latest/userguide/config.html";
-    click G "https://docs.aws.amazon.com/config/latest/developerguide/aggregated-create.html";
-    click H "#enable-aws-config-across-all-accounts-in-multiple-regions";
-```
+![Aggregation authorization decision tree](/img/guides/config/aggregation-authorization-decision.png)
+
+*† Links: [Service-linked Config Aggregator + self-managed StackSet](https://github.com/aws-samples/aws-control-tower-config-customization) | [Service-linked Config Aggregator](https://docs.aws.amazon.com/controltower/latest/userguide/config.html) | [Organizations-based authorization](https://docs.aws.amazon.com/config/latest/developerguide/aggregated-create.html) | [Self-managed StackSet](#enable-aws-config-across-all-accounts-in-all-regions)*
 
 #### **Central Delivery Channel S3 Bucket**
 
