@@ -65,6 +65,12 @@ The [AWS::Config::ResourceCompliance](https://docs.aws.amazon.com/config/latest/
 
 ResourceCompliance recording can be enabled or disabled at the resource type level, but not per-rule or per-resource. And a new ResourceCompliance CI is recorded for a resource when at least one rule's compliance result changes for that resource. Stable resources that remain compliant across many evaluations do not generate continuous CIs. Each CI captures the full compliance state across all rules evaluating that resource.
 
+:::warning AWS Control Tower Dependency
+
+If you use AWS Control Tower with CT-managed detective controls (e.g., `CONFIG.*` controls enabled via the Control Tower console), **do not exclude `AWS::Config::ResourceCompliance` from recording**. The Control Tower console relies on ResourceCompliance configuration items as a trigger to update the noncompliant resources view for detective controls. Without these CIs, the Control Tower console will not display compliance changes — even though Config rules continue to evaluate correctly and the Config aggregator API returns accurate data.
+
+:::
+
 For detailed information on ResourceCompliance costs and CloudTrail alternatives, see the [AWS::Config::ResourceCompliance section](../Resource%20Configuration%20Tracking/#awsconfigresourcecompliance) in Resource Configuration Tracking.
 
 

@@ -36,7 +36,7 @@ Resource exclusion affects inventory tracking and compliance monitoring. If your
 
 We recommend excluding resource types only when you have a pre-determined steps to monitor for noises in aggregation. Use in conjunction with a solutions like [Innovation Sandbox](https://aws.amazon.com/solutions/implementations/innovation-sandbox-on-aws/) to recycle your accounts on predetermined frequency. 
 
-**Note**: When AWS Config integration is enabled in [AWS Control Tower](https://aws.amazon.com/controltower/), AWS Control Tower manages a customer-managed Config recorder on enrolled accounts which is protected from modification via SCP. Control Tower account and landing zone lifecycle events (e.g., updates to managed accounts, landing zone updates) reset the recorder configuration via the underlying CloudFormation StackSet, overwriting any exclusions you applied directly. To persist exclusions in Control Tower environments, deploy the [EventBridge + Lambda re-application architecture](https://aws.amazon.com/blogs/mt/customize-aws-config-resource-tracking-in-aws-control-tower-environment/) that listens for lifecycle events and re-applies your desired recorder configuration. The [GitHub repository](https://github.com/aws-samples/aws-control-tower-config-customization) provides a ready-to-use template. Verify that exclusions don't disable resource types required by Control Tower's detective controls in any enrolled account.
+**Note**: When AWS Config integration is enabled in [AWS Control Tower](https://aws.amazon.com/controltower/), AWS Control Tower manages a customer-managed Config recorder on enrolled accounts which is protected from modification via SCP. Control Tower account and landing zone lifecycle events (e.g., updates to managed accounts, landing zone updates) reset the recorder configuration via the underlying CloudFormation StackSet, overwriting any exclusions you applied directly. To persist exclusions in Control Tower environments, deploy the [EventBridge + Lambda re-application architecture](https://aws.amazon.com/blogs/mt/customize-aws-config-resource-tracking-in-aws-control-tower-environment/) that listens for lifecycle events and re-applies your desired recorder configuration. The [GitHub repository](https://github.com/aws-samples/aws-control-tower-config-customization) provides a ready-to-use template. Verify that exclusions don't disable resource types required by Control Tower's detective controls in any enrolled account. In particular, **do not exclude `AWS::Config::ResourceCompliance`** — the Control Tower console relies on this resource type's configuration items as a trigger to update detective control compliance status (see the [AWS::Config::ResourceCompliance](#awsconfigresourcecompliance) section below for details).
 
 ### Using Relationships in Recorded JSON
 
@@ -57,7 +57,19 @@ For details on how many CIs are generated per relationship type and when they ar
 
 ### AWS::Config::ResourceCompliance
 
-The [AWS::Config::ResourceCompliance](https://docs.aws.amazon.com/config/latest/developerguide/view-compliance-history.html) resource type provides a timeline view of compliance status in the AWS Config console. While it offers valuable insights, it can significantly increase configuration item costs, particularly when evaluating large numbers of resources.
+The [AWS::Config::ResourceCompliance](https://docs.aws.amazon.com/config/latest/developerguide/view-compliance-history.html) resource type provides a timeline view of compliance status in the AWS Config console. While it offers valuable insights, it can increase configuration item costs, particularly when evaluating large numbers of resources.
+
+:::warning AWS Control Tower Dependency
+
+The `AWS::Config::ResourceCompliance` CI serves a dual purpose in Control Tower environments. Beyond providing historical compliance timeline data directly in AWS Config, it acts as the trigger mechanism for the Control Tower console to update detective control compliance status. The following occurs when ResourceCompliance is excluded from recording:
+
+- Config rules still evaluate resources correctly ✓
+- The Config aggregator API still reports correct compliance data ✓
+- **The Control Tower console does NOT update** — the noncompliant resources table remains stale indefinitely
+
+**Recommendation:** In Control Tower environments with detective controls enabled (e.g., `CONFIG.*` controls), do not exclude `AWS::Config::ResourceCompliance`. Instead, consider alternative cost optimization approaches if you rely on the console for noncompliant resource reporting.
+
+:::
 
 For historical compliance checks, you can utilize AWS CloudTrail data as a cost-free alternative. Query CloudTrail logs delivered to Amazon S3 using Amazon Athena, ingest them into Amazon CloudWatch, or third-party solutions. The following query is a sample Athena query:
 
