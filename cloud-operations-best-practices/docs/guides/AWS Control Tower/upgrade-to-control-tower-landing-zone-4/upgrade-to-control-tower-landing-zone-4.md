@@ -495,6 +495,15 @@ When you re-register an OU:
 
 > **Troubleshooting**: If an account was already in a drifted state before the upgrade, it may remain drifted after re-registration. In this case, open a support case with AWS Support in the affected account to investigate and resolve the persistent drift.
 
+#### Automated OU re-registration
+
+For large organizations manually re-registering each OU can become operationally burdensome, the [ControlTower Organization Re-Registration Automation](https://github.com/aws-samples/sample-ControlTower-Organization-ReRegistration) solution provides an event-driven solution deployed via CloudFormation. It uses EventBridge and Lambda to sequentially re-register OUs and update member accounts, handling baseline resets, optional control resets, and concurrency limits automatically. The solution also includes a Closed Account Sentinel to identify and clean up suspended accounts that still have Control Tower baselines enabled.
+
+The solution provides two engines:
+
+- **OU Engine** — Sequentially re-registers each OU by invoking `ResetEnabledBaseline` (or `UpdateEnabledBaseline` if the baseline version is incompatible). Starting from V4.0, it also resets optional controls, replicating the full console re-registration behavior via API. For most customers on V4.0+, the OU Engine alone is sufficient.
+- **Accounts Engine** — Updates individual member accounts by invoking `UpdateProvisionedProduct` through Service Catalog, processing up to 5 accounts concurrently (configurable up to 10). This engine is needed when account-level updates are required beyond what the OU-level baseline reset covers.
+
 ## Additional resources
 
 - [AWS Control Tower User Guide](https://docs.aws.amazon.com/controltower/latest/userguide/)
