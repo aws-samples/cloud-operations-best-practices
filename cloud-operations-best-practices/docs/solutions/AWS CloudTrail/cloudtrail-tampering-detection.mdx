@@ -9,27 +9,63 @@ Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 SPDX-License-Identifier: MIT-0
 */}
 
-# Real-Time CloudTrail Tampering Detection and Automated Remediation
+# Near Real-Time CloudTrail Tampering Detection and Automated Remediation
 
----
+## The Challenge
 
-AWS CloudTrail is the foundation of your AWS audit trail — it records every API call made in your account and delivers those records to Amazon S3 and optionally to Amazon CloudWatch Logs. Protecting the integrity of that trail is critical: if logging is stopped or the trail is deleted, you lose visibility into account activity at exactly the moment you may need it most.
+[AWS CloudTrail](https://docs.aws.amazon.com/cloudtrail/latest/userguide/) Trails are the foundation of your AWS audit trail. It records every API call made in your account and delivers those records to [Amazon S3](https://docs.aws.amazon.com/s3/latest/userguide/) and optionally to [Amazon CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/). Protecting the integrity of that trail is critical: if logging is stopped or the trail is deleted, maintaining continuous visibility into account activity is essential for your security operations.
 
-This solution deploys a layered detection and response stack that alerts your security team within seconds of a CloudTrail tampering event and, optionally, automatically re-enables logging without human intervention. It uses CloudWatch metric filters and alarms for durable log-based detection, EventBridge rules for near real-time event matching (~30 seconds), Amazon Simple Notification Service (Amazon SNS) for alert delivery, and an optional AWS Lambda function for automated remediation.
+Without near real-time detection, a threat actor who disables CloudTrail logging has a window to operate undetected. [AWS Config](https://docs.aws.amazon.com/config/latest/developerguide/) can detect the configuration drift, but its evaluation cycle may not run immediately. During that gap, the threat actor can perform unauthorized actions with no audit record. This solution closes that gap by detecting unauthorized configuration changes as soon as they occur and optionally re-enabling logging automatically.
+
+This solution deploys a layered detection and response stack that alerts your security team shortly after a CloudTrail unauthorized configuration change occurs and, optionally, automatically re-enables logging without human intervention. It uses [CloudWatch](https://docs.aws.amazon.com/cloudwatch/) metric filters and CloudWatch alarms for durable log-based detection, [Amazon EventBridge](https://docs.aws.amazon.com/eventbridge/) rules for near real-time event matching, [Amazon SNS](https://docs.aws.amazon.com/sns/) for alert delivery, and an optional [AWS Lambda](https://docs.aws.amazon.com/lambda/), a serverless compute service that runs code in response to events, function for automated remediation.
+
+## Prerequisites
+
+Before deploying this solution, verify the following are in place:
+
+- **AWS CloudTrail trail** - An active trail in the target region, configured to deliver management events.
+- **CloudWatch Logs integration** - The trail must be configured to deliver logs to a CloudWatch Logs log group. Note the log group name, as you need it as a parameter.
+- **Amazon SNS email confirmation** - After stack creation, AWS SNS sends a subscription confirmation email to the address you provide. You must click the confirmation link. Alerts are not delivered until the subscription is confirmed.
+- **AWS Identity and Access Management (IAM) permissions** - The IAM principal deploying the stack needs permissions to create SNS topics, CloudWatch alarms, EventBridge rules, and (if enabling auto-remediation) Lambda functions and IAM roles. The `CAPABILITY_IAM` and `CAPABILITY_NAMED_IAM` capabilities must be acknowledged when creating the stack.
+- **Amazon S3 bucket security** - The CloudTrail log Amazon S3 bucket must have Block Public Access enabled (all four settings), server-side encryption (SSE-S3 or SSE-AWS KMS), versioning enabled, and access logging configured. For production environments, enable Multi-Factor Authentication (MFA) Delete on the bucket.
+- **AWS CLI (optional)** - For command-line deployment and the clean-up step.
+
+:::warning Template Does Not Validate Amazon S3 Bucket Security Settings
+The AWS CloudFormation template does NOT validate Amazon S3 bucket security settings. The stack deploys successfully even if prerequisites are not met, leaving a potential gap in your CloudTrail log protection. Verify all prerequisites using the AWS CLI commands before deployment.
+:::
+
+For continuous enforcement after deployment, enable the following [AWS Config managed rules](https://docs.aws.amazon.com/config/latest/developerguide/managed-rules-by-aws-config.html) to detect and alert if the bucket's security configuration degrades:
+
+- [`s3-bucket-public-read-prohibited`](https://docs.aws.amazon.com/config/latest/developerguide/s3-bucket-public-read-prohibited.html) - detects if Block Public Access is disabled
+- [`s3-bucket-server-side-encryption-enabled`](https://docs.aws.amazon.com/config/latest/developerguide/s3-bucket-server-side-encryption-enabled.html) - detects if default encryption is removed
+- [`s3-bucket-versioning-enabled`](https://docs.aws.amazon.com/config/latest/developerguide/s3-bucket-versioning-enabled.html) - detects if versioning is disabled
+- [`s3-bucket-logging-enabled`](https://docs.aws.amazon.com/config/latest/developerguide/s3-bucket-logging-enabled.html) - detects if access logging is removed
+
+## Implementation Priority
+
+Deploy in this sequence to maximize security coverage from day one:
+
+1. Verify Amazon S3 bucket prerequisites - Confirm Block Public Access, encryption, versioning, and access logging are enabled before deploying.
+2. Deploy detection-only stack - Set `EnableAutoRemediation=false` to deploy the core detection layer first. Confirm the Amazon SNS email subscription.
+3. Validate alerting - Trigger a test event and confirm alerts arrive.
+4. Enable Amazon S3 protection - Provide `CloudTrailLogBucketName` to apply the hardening bucket policy to the CloudTrail log delivery bucket.
+5. Enable auto-remediation - After validating detection, set `EnableAutoRemediation=true`.
+6. Apply preventive controls - Attach the `MonitoringStackProtectionPolicy` to IAM roles. Apply a Service Control Policy (SCP) if using AWS Organizations.
+7. Multi-region rollout - Use AWS CloudFormation StackSets to deploy to all regions with active trails.
 
 ## How This Solution Works Alongside AWS Config
 
-AWS Config and this real-time detection solution are complementary layers in a defense-in-depth strategy — each brings distinct strengths that reinforce the other.
+AWS Config and this near real-time detection solution are complementary layers in a defense-in-depth strategy, each bringing distinct strengths that reinforce the other.
 
-**AWS Config managed rules** provide continuous compliance evaluation of your CloudTrail configuration. Three managed rules are particularly relevant:
+[AWS Config](https://docs.aws.amazon.com/config/latest/developerguide/) managed rules provide continuous compliance evaluation of your CloudTrail configuration. Three managed rules are particularly relevant:
 
-- **`cloudtrail-enabled`** — Verifies that at least one CloudTrail trail is active in the account.
-- **`cloud-trail-log-file-validation-enabled`** — Checks that log file validation is turned on, ensuring log integrity.
-- **`cloudtrail-s3-dataevents-enabled`** — Confirms that S3 data event logging is configured.
+- **[`cloudtrail-enabled`](https://docs.aws.amazon.com/config/latest/developerguide/cloudtrail-enabled.html)** - Verifies that at least one CloudTrail trail is active in the account.
+- **[`cloud-trail-log-file-validation-enabled`](https://docs.aws.amazon.com/config/latest/developerguide/cloud-trail-log-file-validation-enabled.html)** - Checks that log file validation is turned on, ensuring log integrity.
+- **[`cloudtrail-s3-dataevents-enabled`](https://docs.aws.amazon.com/config/latest/developerguide/cloudtrail-s3-dataevents-enabled.html)** - Confirms that Amazon S3 data event logging is configured.
 
 AWS Config evaluates these rules on a schedule and whenever a configuration change is recorded. It maintains a full configuration history and can trigger AWS Systems Manager Automation runbooks for remediation. This makes it an excellent tool for drift detection over time, compliance reporting, and understanding the history of configuration changes.
 
-**This solution** adds a real-time operational detection layer on top of that foundation. Where AWS Config evaluates compliance periodically, EventBridge rules match CloudTrail management events within approximately 30 seconds of the API call. Where AWS Config records that a trail was deleted, this solution fires an SNS alert to your security team and — if auto-remediation is enabled — calls `StartLogging` before the next AWS Config evaluation cycle even runs.
+This solution adds a near real-time operational detection layer on top of that foundation. Where AWS Config evaluates compliance periodically, EventBridge rules match CloudTrail management events shortly after the API call is made. Where AWS Config records that a trail was deleted, this solution fires an SNS alert to your security team and if auto-remediation is enabled, calls StartLogging before the next AWS Config evaluation cycle even runs.
 
 Together, the two layers give you both the historical compliance record that AWS Config excels at and the immediate operational response that this solution provides.
 
@@ -57,23 +93,23 @@ A CloudWatch alarm watches each metric with a one-minute evaluation period and a
 
 ### EventBridge Rule Layer
 
-EventBridge matches CloudTrail management events directly on the default event bus, typically within 30 seconds of the API call — before the log entry has even been delivered to CloudWatch Logs. Two EventBridge rules are deployed:
+EventBridge matches CloudTrail management events directly on the default event bus shortly after the API call is made, before the log entry has even been delivered to CloudWatch Logs. Two EventBridge rules are deployed:
 
-**Trail tampering rule** — matches `StopLogging`, `DeleteTrail`, and `UpdateTrail` events from `aws.cloudtrail` and routes them to the SNS topic.
+**Trail tampering rule** - matches `StopLogging`, `DeleteTrail`, and `UpdateTrail` events from `aws.cloudtrail` and routes them to the SNS topic.
 
-**S3 bucket protection rule** — matches `DeleteBucket`, `DeleteBucketPolicy`, and `PutBucketAcl` events from `aws.s3` and routes them to the SNS topic. This protects the S3 bucket that receives your CloudTrail log files from destructive operations.
+**Amazon S3 bucket protection rule** - matches `DeleteBucket`, `DeleteBucketPolicy`, and `PutBucketAcl` events from `aws.s3` and routes them to the SNS topic. This protects the Amazon S3 bucket that receives your CloudTrail log files from destructive operations.
 
 ### SNS Alert Delivery
 
 Both detection layers route to a single SNS topic. An email subscription delivers alerts to your security team. You can add additional subscriptions (SMS, Lambda, SQS, HTTP endpoint) directly to the topic after deployment.
 
-The topic policy restricts publishing to the owning account, `cloudwatch.amazonaws.com`, and `events.amazonaws.com`, each scoped to the account via `aws:SourceAccount`. This prevents cross-account abuse.
+The topic policy restricts publishing to the owning account, `cloudwatch.amazonaws.com`, and `events.amazonaws.com`, each scoped to the account via `aws:SourceAccount`. This prevents unintended cross-account publishing.
 
 ### Optional Lambda Auto-Remediation
 
 When `EnableAutoRemediation` is set to `true`, the stack also deploys a Lambda function that automatically calls `cloudtrail:StartLogging` when a `StopLogging` event fires. The function:
 
-1. Extracts the trail ARN from `event.detail.requestParameters.name`.
+1. Extracts the trail Amazon Resource Name (ARN) from `event.detail.requestParameters.name`.
 2. Calls `cloudtrail:StartLogging` with that ARN.
 3. Logs the trail ARN and a success timestamp to CloudWatch Logs.
 4. On any error, logs the full exception details and re-raises so EventBridge records the invocation as failed.
@@ -82,21 +118,25 @@ The IAM execution role uses least-privilege permissions: `cloudtrail:StartLoggin
 
 ## Multi-Region Deployment
 
-CloudTrail operates per region. To protect all regions where you have active trails, you must deploy this stack in each region.
+By default, CloudTrail creates an account-level trail that captures management events only in the region where it is configured. An account-level trail delivers logs to CloudWatch Logs only in that same region. This means EventBridge rules and CloudWatch metric filters in one region cannot detect unauthorized configuration changes that occur in another region. To protect all regions where you have active trails, you must deploy this stack in each region.
 
-**Per-region requirements:**
+Per-region requirements:
 
 - Each region must have a CloudTrail trail configured to deliver logs to a CloudWatch Logs log group. The `CloudTrailLogGroupName` parameter must reference the log group in the same region as the stack.
-- EventBridge rules are regional — a rule in `us-east-1` only matches events in `us-east-1`.
+- EventBridge rules are regional - a rule in `us-east-1` only matches events in `us-east-1`.
 - The SNS topic and Lambda function (if enabled) are also regional resources.
+
+:::note Account-Level Trail Limitation
+If you are using a default account-level trail, it only delivers to CloudWatch Logs in the trail's home region. To get cross-region coverage, you must either configure a multi-region trail (which captures events from all regions but still delivers to CloudWatch Logs in a single region) or deploy individual trails in each region. For this solution to work in a given region, a CloudWatch Logs log group receiving CloudTrail events must exist in that region.
+:::
 
 **AWS Organizations trails:**
 
-If you use an AWS Organizations trail, a single trail can cover all accounts in your organization. However, this solution must still be deployed in each region where you want near real-time alerting. The organizational trail delivers logs to a centralized S3 bucket, but the CloudWatch Logs log group and EventBridge rules remain regional.
+If you use an AWS Organizations trail, a single trail can cover all accounts in your organization. However, this solution must still be deployed in each region where you want near real-time alerting. The organizational trail delivers logs to a centralized Amazon S3 bucket, but the CloudWatch Logs log group and EventBridge rules remain regional.
 
-**Scaling with CloudFormation StackSets:**
+**Scaling with AWS CloudFormation StackSets:**
 
-For multi-region or multi-account deployments, use AWS CloudFormation StackSets to deploy the stack consistently across all target regions and accounts. StackSets let you specify a list of target regions and accounts, and CloudFormation handles the parallel deployment. Use service-managed StackSets with AWS Organizations integration to automatically include new accounts as they join your organization.
+For multi-region or multi-account deployments, use [AWS CloudFormation StackSets](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/what-is-cfnstacksets.html) to deploy the stack consistently across all target regions and accounts. StackSets let you specify a list of target regions and accounts, and AWS CloudFormation handles the parallel deployment. Use service-managed StackSets with AWS Organizations integration to automatically include new accounts as they join your organization.
 
 ```bash
 aws cloudformation create-stack-set \
@@ -120,9 +160,9 @@ Check the SNS notification for the event source, event name, and the principal t
 **2. Assess the impact**
 
 - For `StopLogging`: Determine how long logging was stopped. Check CloudTrail for the most recent events before the gap. If auto-remediation is enabled, verify that `StartLogging` was called successfully by checking the Lambda function logs in CloudWatch Logs (`/aws/lambda/CloudTrailAutoRemediation-<stack-name>`).
-- For `DeleteTrail`: The trail cannot be automatically restored. Create a new trail immediately and configure it to deliver logs to the same CloudWatch Logs log group and S3 bucket.
-- For `UpdateTrail`: Review the change. Common concerns include disabling log file validation, changing the S3 bucket destination, or removing CloudWatch Logs integration.
-- For S3 bucket events (`DeleteBucket`, `DeleteBucketPolicy`, `PutBucketAcl`): Assess whether log delivery has been disrupted. Restore the bucket policy if needed and verify that CloudTrail can still deliver logs.
+- For `DeleteTrail`: The trail cannot be automatically restored. Create a new trail immediately and configure it to deliver logs to the same CloudWatch Logs log group and Amazon S3 bucket.
+- For `UpdateTrail`: Review the change. Common concerns include disabling log file validation, changing the Amazon S3 bucket destination, or removing CloudWatch Logs integration.
+- For Amazon S3 bucket events (`DeleteBucket`, `DeleteBucketPolicy`, `PutBucketAcl`): Assess whether log delivery has been disrupted. Restore the bucket policy if needed and verify that CloudTrail can still deliver logs.
 
 **3. Contain and remediate**
 
@@ -134,37 +174,12 @@ Check the SNS notification for the event source, event name, and the principal t
 **4. Document and review**
 
 - Record the incident timeline, the principal involved, and the remediation steps taken.
-- Review CloudTrail events for the 24 hours before the tampering event to identify any reconnaissance activity.
+- Review CloudTrail events for the 24 hours before the unauthorized configuration change to identify any reconnaissance activity.
 - Consider adding an AWS Config rule or SCP to prevent `StopLogging` and `DeleteTrail` calls from non-administrative principals. See the [Strengthening Trail Deletion Prevention](#strengthening-trail-deletion-prevention) section for detailed guidance.
 
 ## Security Responsibilities
 
-This solution follows the AWS Shared Responsibility Model. Understanding the division of responsibilities helps you deploy and operate the solution securely.
-
-### AWS Responsibilities
-
-- Physical and environmental security of the underlying infrastructure
-- Security of the managed services used by this solution:
-  - **Amazon CloudWatch** — service availability, redundancy, and encryption of data in transit between AWS services
-  - **Amazon EventBridge** — event bus security, isolation between accounts, and service availability
-  - **Amazon Simple Notification Service (Amazon SNS)** — message encryption in transit between AWS services, service availability
-  - **AWS Lambda** — runtime environment security, patching, and underlying compute infrastructure
-  - **Amazon S3** — infrastructure security, durability, and availability of the storage service
-- Patching and maintenance of the Lambda runtime environment
-- Availability and durability of AWS KMS, Amazon SNS, and Amazon SQS services
-- Encryption of data in transit between AWS services
-
-### Customer Responsibilities
-
-- **IAM access control** — Restricting who can modify or delete the monitoring resources deployed by this stack
-- **SNS subscription management** — Managing subscriptions and ensuring the notification email address is controlled by your security team
-- **AWS Key Management Service (AWS KMS) key management** — Rotating and controlling access to the AWS KMS key used to encrypt the SNS topic
-- **CloudWatch Logs encryption** — Configuring customer-managed KMS key encryption on the CloudTrail log group (AWS manages service infrastructure; customers are responsible for configuring KMS key encryption on log groups)
-- **S3 bucket configuration** — Enabling Block Public Access, server-side encryption, versioning, and access logging on the CloudTrail log bucket before deploying this stack
-- **Lambda function monitoring** — Reviewing the Dead Letter Queue for failed auto-remediation invocations
-- **Incident response** — Investigating and responding to alerts delivered by this solution according to your organization's incident response procedures
-- **Multi-region coverage** — Deploying this stack in every region where you have active CloudTrail trails
-- **SCP and permission boundary controls** — Applying preventive controls (see [Strengthening Trail Deletion Prevention](#strengthening-trail-deletion-prevention)) to complement this detective solution
+This solution follows the [AWS Shared Responsibility Model](https://aws.amazon.com/compliance/shared-responsibility-model/). Understanding the division of responsibilities helps you deploy and operate the solution securely.
 
 ## Prerequisites
 
@@ -241,7 +256,7 @@ This solution detects and alerts on `DeleteTrail` events within seconds and incl
 
 ### Option 1: AWS Service Control Policy (Recommended for AWS Organizations)
 
-If your account is part of an AWS Organization, a Service Control Policy (SCP) is the strongest available preventive control. An SCP applies to every IAM principal in the account — including administrators — and cannot be overridden by account-level IAM policies.
+If your account is part of an AWS Organization, a [Service Control Policy (SCP)](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html) is the strongest available preventive control. An SCP applies to every IAM principal in the account — including administrators — and cannot be overridden by account-level IAM policies.
 
 Apply the following SCP to the target OU or account, substituting your break-glass role ARN:
 
@@ -330,105 +345,8 @@ aws sns delete-topic --topic-arn <AlertTopicArn>
 
 The `AlertTopicArn` value is available in the CloudFormation stack **Outputs** tab.
 
-## Data Security and Classification
-
-### Data Classification
-
-The data handled by this solution is classified as **CONFIDENTIAL**. The SNS topic receives CloudTrail event details including IAM principal ARNs, source IP addresses, and API call parameters. This information must be protected from unauthorized disclosure.
-
-### Encryption Requirements
-
-- **SNS topic** — Encrypted at rest using a customer-managed AWS KMS key (`AlertTopicKmsKey`) with automatic annual key rotation enabled. All messages published to the topic are encrypted.
-- **CloudWatch Logs** — CloudTrail log groups **must** be encrypted using a customer-managed AWS KMS key. Enable encryption before deploying this stack:
-  ```bash
-  aws logs associate-kms-key \
-    --log-group-name <your-log-group-name> \
-    --kms-key-id <your-kms-key-arn>
-  ```
-  Verify encryption is configured (deployment must not proceed if this returns `null`):
-  ```bash
-  aws logs describe-log-groups \
-    --log-group-name-prefix <your-log-group-name> \
-    --query 'logGroups[0].kmsKeyId'
-  ```
-- **Amazon SQS Dead Letter Queue** — The Amazon SQS Dead Letter Queue is encrypted at rest using the same AWS KMS key as the SNS topic (`AlertTopicKmsKey`).
-- **Data in transit** — All communication between AWS services uses TLS. The S3 bucket policy enforces HTTPS-only access (`aws:SecureTransport: false` deny).
-
-### Retention Guidance
-
-- **CloudWatch Logs** — Set a retention policy on the CloudTrail log group (recommended: 365 days for compliance, 90 days minimum):
-  ```bash
-  aws logs put-retention-policy \
-    --log-group-name <your-log-group-name> \
-    --retention-in-days 365
-  ```
-  Verify: `aws logs describe-log-groups --log-group-name-prefix <your-log-group-name> --query 'logGroups[0].retentionInDays'`
-- **Amazon SNS topic** — Messages are not retained after delivery. Verify that your email system retains alert messages according to your incident response policy.
-- **Amazon SQS DLQ** — Messages are retained for 14 days (1,209,600 seconds), configured in the CloudFormation template. Review and process DLQ messages promptly.
-
-### Access Control
-
-- The Amazon SNS topic policy restricts publishing to CloudWatch, EventBridge, and the account root.
-- The `DenySubscriptionEnumeration` statement prevents non-root principals from listing subscriptions, protecting the security team email address from disclosure.
-- The Lambda execution role uses least-privilege permissions scoped to the specific trail ARN and Lambda log group.
-- The `MonitoringStackProtectionPolicy` IAM Managed Policy prevents non-administrative principals from deleting or disabling monitoring resources.
-
-### AWS KMS Key Management Strategy
-
-The Amazon SNS topic, Amazon SQS Dead Letter Queue, and Lambda log group are encrypted using a customer-managed AWS KMS key (`AlertTopicKmsKey`) created by this stack:
-
-- **Key rotation** — Automatic annual rotation is enabled by default (`EnableKeyRotation: true`).
-- **Key policy** — Grants access to Amazon SNS, Amazon CloudWatch, Amazon EventBridge, CloudWatch Logs, and the account root. All service principal statements use `kms:ViaService` or `kms:EncryptionContext` conditions to scope access.
-- **Key alias** — `alias/cloudtrail-monitoring-sns-<stack-name>` for easy identification.
-- **Deletion policy** — The key has `DeletionPolicy: Retain`. Schedule key deletion only after confirming no active use (minimum 7-day waiting period).
-
-> **BYOK Review Required:** Before deploying to production, your security team must review and approve the AWS KMS key policy grants, confirm automatic key rotation is enabled, and verify access controls are scoped to required service principals only.
-
-## Security Considerations
-
-### Auto-Remediation Risks
-
-Enabling `EnableAutoRemediation` introduces automated changes to your CloudTrail configuration. Consider the following before enabling:
-
-- **False positive risk** — If a legitimate `StopLogging` call is made (for example, during planned maintenance), the Lambda function automatically re-enables logging. This may interfere with maintenance windows. Use the `TrailName` parameter to scope remediation to a specific trail.
-- **Remediation loop** — If an attacker repeatedly calls `StopLogging`, the Lambda function repeatedly calls `StartLogging`. Monitor the Lambda invocation count and DLQ for signs of abuse.
-- **IAM permission scope** — The Lambda execution role has `cloudtrail:StartLogging` permission scoped to the specific trail ARN. Verify the `TrailName` parameter is set correctly before enabling auto-remediation.
-- **Dead Letter Queue** — Failed Lambda invocations are sent to the SQS DLQ. Monitor the DLQ and set up an alarm on the `ApproximateNumberOfMessagesVisible` metric to detect remediation failures.
-
-### IAM Access Review Procedures
-
-Perform the following reviews on a regular schedule to maintain least-privilege access:
-
-- **Quarterly** — Review the Lambda execution role policy (`CloudTrailAutoRemediationPolicy`) and monitoring protection policy attachments. Remove any principals that no longer require access. Use AWS IAM Access Analyzer to identify unused permissions.
-- **Annually** — Audit all IAM principals with `cloudformation:UpdateStack` or `cloudformation:DeleteStack` permissions on this stack.
-- **On team changes** — When security team members leave or change roles, review and revoke Amazon SNS topic subscriptions and stack modification permissions.
-- **Continuously** — Review CloudTrail logs for IAM policy usage patterns to identify over-privileged principals.
-
-### IAM Permission Requirements
-
-Deploying this stack requires the following IAM permissions:
-- `cloudformation:CreateStack`, `cloudformation:DescribeStacks`
-- `sns:CreateTopic`, `sns:SetTopicAttributes`, `sns:Subscribe`
-- `cloudwatch:PutMetricAlarm`, `logs:PutMetricFilter`
-- `events:PutRule`, `events:PutTargets`
-- `iam:CreateRole`, `iam:CreatePolicy`, `iam:AttachRolePolicy` (with `CAPABILITY_IAM`)
-- AWS KMS permissions: `kms:CreateKey`, `kms:CreateAlias` (for SNS encryption)
-- `lambda:CreateFunction`, `lambda:AddPermission` (if enabling auto-remediation)
-- `sqs:CreateQueue` (if enabling auto-remediation)
-
-### Residual Risks
-
-| Risk | Severity | Mitigation |
-|---|---|---|
-| Trail deletion cannot be auto-reversed | High | Apply SCP or Organizations trail (see [Strengthening Trail Deletion Prevention](#strengthening-trail-deletion-prevention)) |
-| Multi-region gaps | Medium | Deploy stack in every region with active trails |
-| CloudWatch Logs delivery delay | Low | EventBridge layer provides ~30-second detection as primary path |
-| Lambda DLQ not monitored | Medium | Set CloudWatch alarm on DLQ message count |
-| AWS KMS key deletion | High | AWS KMS key has `DeletionPolicy: Retain`; schedule deletion only after confirming no active use |
-| MFA Delete not enabled | Medium | Cannot be configured via CloudFormation — requires root account credentials. Enable manually after stack deployment: (1) Sign in with root account credentials, (2) obtain your root MFA device ARN from IAM console → Security credentials, (3) generate a current MFA code, then run: `aws s3api put-bucket-versioning --bucket <bucket> --versioning-configuration Status=Enabled,MFADelete=Enabled --mfa "<mfa-device-arn> <mfa-code>"`. Verify: `aws s3api get-bucket-versioning --bucket <bucket>` |
-
 ## Conclusion
 
-This solution adds a near real-time detection and automated response layer to your CloudTrail security posture. By combining CloudWatch metric filters and alarms with EventBridge rules, you get both durable metric history and fast event-driven alerting. The optional Lambda auto-remediation function minimizes the window during which logging is inactive, and the S3 bucket protection rules extend coverage to the log delivery bucket itself.
+This solution adds a near real-time detection and automated response layer to your CloudTrail security posture. By combining CloudWatch metric filters and alarms with EventBridge rules, you get both durable metric history and fast event-driven alerting. The optional Lambda auto-remediation function minimizes the window during which logging is inactive, and the Amazon S3 bucket protection rules extend coverage to the log delivery bucket itself.
 
-Deployed alongside AWS Config managed rules (`cloudtrail-enabled`, `cloud-trail-log-file-validation-enabled`, `cloudtrail-s3-dataevents-enabled`), this solution forms a comprehensive defense-in-depth strategy: AWS Config provides continuous compliance evaluation and configuration history, while this stack provides the operational alerting and automated response that keeps your audit trail intact in real time.
+Deployed alongside AWS Config managed rules ([`cloudtrail-enabled`](https://docs.aws.amazon.com/config/latest/developerguide/cloudtrail-enabled.html), [`cloud-trail-log-file-validation-enabled`](https://docs.aws.amazon.com/config/latest/developerguide/cloud-trail-log-file-validation-enabled.html), [`cloudtrail-s3-dataevents-enabled`](https://docs.aws.amazon.com/config/latest/developerguide/cloudtrail-s3-dataevents-enabled.html)), this solution forms a comprehensive defense-in-depth strategy: AWS Config provides continuous compliance evaluation and configuration history, while this stack provides the operational alerting and automated response that keeps your audit trail intact in near real time.
