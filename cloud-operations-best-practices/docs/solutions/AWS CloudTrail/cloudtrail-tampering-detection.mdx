@@ -27,7 +27,7 @@ Before deploying this solution, verify the following are in place:
 
 > [!WARNING] 
 > Template Does Not Validate Amazon S3 Bucket Security Settings
-> The [AWS CloudFormation](https://aws.amazon.com/cloudformation/) template does NOT validate Amazon S3 bucket security settings. The stack deploys successfully even if prerequisites are not met, leaving a potential gap in your CloudTrail log protection. Verify all prerequisites using the AWS CLI commands before deployment.
+> The [AWS CloudFormation](https://aws.amazon.com/cloudformation/) template does not validate Amazon S3 bucket security settings. The stack deploys successfully even if prerequisites are not met, leaving a potential gap in your CloudTrail log protection. Verify all prerequisites using the AWS CLI commands before deployment.
 
 For continuous enforcement after deployment, enable the following [AWS Config managed rules](https://docs.aws.amazon.com/config/latest/developerguide/managed-rules-by-aws-config.html) to detect and alert if the bucket's security configuration degrades:
 
