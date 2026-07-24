@@ -1,6 +1,6 @@
 ---
 sidebar_position: 3
-title: Real-Time CloudTrail Tampering Detection and Automated Remediation
+title: Near Real-Time CloudTrail Tampering Detection and Automated Remediation
 description: Deploy a defense-in-depth detection stack using CloudWatch metric filters, EventBridge rules, SNS notifications, and optional Lambda auto-remediation to protect your CloudTrail configuration in near real time.
 ---
 
@@ -8,11 +8,11 @@ description: Deploy a defense-in-depth detection stack using CloudWatch metric f
 
 ## The Challenge
 
-[AWS CloudTrail](https://docs.aws.amazon.com/cloudtrail/latest/userguide/) Trails are the foundation of your AWS audit trail. It records every API call made in your account and delivers those records to [Amazon Simple Storage Service (Amazon S3)](https://docs.aws.amazon.com/s3/latest/userguide/) and optionally to [Amazon CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/). Protecting the integrity of that trail is critical: if logging is stopped or the trail is deleted, maintaining continuous visibility into account activity is essential for your security operations.
+[AWS CloudTrail](https://docs.aws.amazon.com/cloudtrail/latest/userguide/) is the foundation of your AWS audit trail. It records every API call made in your account and delivers those records to [Amazon Simple Storage Service (Amazon S3)](https://docs.aws.amazon.com/s3/latest/userguide/) and optionally to [Amazon CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/). Protecting the integrity of that trail is critical: if logging is stopped or the trail is deleted, you lose continuous visibility into account activity is essential for your security operations.
 
-Without near real-time detection, a threat actor who disables CloudTrail logging has a window to operate undetected. [AWS Config](https://docs.aws.amazon.com/config/latest/developerguide/) can detect the configuration drift, but its evaluation cycle may not run immediately. During that gap, the threat actor can perform unauthorized actions with no audit record. This solution closes that gap by detecting unauthorized configuration changes as soon as they occur and optionally re-enabling logging automatically.
+Without near real-time detection, a unauthorized actor who disables CloudTrail logging has a window to operate undetected. [AWS Config](https://docs.aws.amazon.com/config/latest/developerguide/) can detect the configuration drift, but its evaluation cycle may not run immediately. During that gap, the unauthorized  actor can perform unauthorized actions with no audit record. This solution closes that gap by detecting unauthorized configuration changes as soon as they occur and optionally re-enabling logging automatically.
 
-This solution deploys a layered detection and response stack that alerts your security team shortly after a CloudTrail unauthorized configuration change occurs and, optionally, automatically re-enables logging without human intervention. It uses [CloudWatch metric filters](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/MonitoringLogData.html) and [CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Alarms.html) for durable log-based detection, [Amazon EventBridge](https://docs.aws.amazon.com/eventbridge/) rules for near real-time event matching, [Amazon Simple Notification Service (Amazon SNS)](https://docs.aws.amazon.com/sns/) for alert delivery, and an optional [AWS Lambda](https://docs.aws.amazon.com/lambda/), a serverless compute service that runs code in response to events, function for automated remediation.
+This solution deploys a layered detection and response stack that alerts your security team shortly after a CloudTrail unauthorized configuration change occurs and, optionally, automatically re-enables logging without human intervention. It uses [CloudWatch metric filters](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/MonitoringLogData.html) and [CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Alarms.html) for durable log-based detection, [Amazon EventBridge](https://docs.aws.amazon.com/eventbridge/) rules for near real-time event matching, [Amazon Simple Notification Service (Amazon SNS)](https://docs.aws.amazon.com/sns/) for alert delivery, and an optional [AWS Lambda](https://docs.aws.amazon.com/lambda/) function for automated remediation.
 
 ## Prerequisites
 
@@ -20,7 +20,7 @@ Before deploying this solution, verify the following are in place:
 
 - **[AWS CloudTrail trail](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html)** - An active trail in the target region, configured to deliver management events.
 - **[CloudWatch Logs integration](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/send-cloudtrail-events-to-cloudwatch-logs.html)** - The trail must be configured to deliver logs to a CloudWatch Logs log group. Note the log group name, as you need it as a parameter.
-- **Amazon SNS email confirmation** - After stack creation, AWS SNS sends a subscription confirmation email to the address you provide. You must click the confirmation link. Alerts are not delivered until the subscription is confirmed.
+- **Amazon SNS email confirmation** - After stack creation, Amazon SNS sends a subscription confirmation email to the address you provide. You must click the confirmation link. Alerts are not delivered until the subscription is confirmed.
 - **[AWS Identity and Access Management (IAM)](https://aws.amazon.com/iam/) permissions** - The IAM principal deploying the stack needs permissions to create SNS topics, CloudWatch alarms, EventBridge rules, and (if enabling auto-remediation) Lambda functions and IAM roles. The `CAPABILITY_IAM` and `CAPABILITY_NAMED_IAM` capabilities must be acknowledged when creating the stack.
 - **[Amazon S3 bucket security](https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html)** - The CloudTrail log Amazon S3 bucket must have Block Public Access enabled (all four settings), server-side encryption (SSE-S3 or SSE-AWS KMS), versioning enabled, and access logging configured. For production environments, enable Multi-Factor Authentication (MFA) Delete on the bucket.
 - **AWS CLI (optional)** - For command-line deployment and the clean-up step.
@@ -106,7 +106,10 @@ Together, the two layers give you both the historical compliance record that AWS
 
 The solution uses two parallel detection paths that both route to the same SNS topic, so your security team receives alerts from whichever layer fires first.
 
-![[Image describes detection architecture of CloudTrail Security monitoring]CloudTrail Security Monitoring Architecture](/cloud-operations-best-practices/static/img/solutions/cloudtrail-security-monitoring/architecture-diagram.svg)
+![[CloudTrail Security monitoring architecture showing two parallel detection paths routing to a shared SNS topic]CloudTrail Security Monitoring Architecture](/cloud-operations-best-practices/static/img/solutions/cloudtrail-security-monitoring/architecture-diagram.svg)
+<div align="center">
+Figure 1: CloudTrail Security Monitoring detection architecture
+</div>
 
 ### CloudWatch Metric Filter and Alarm Layer
 
