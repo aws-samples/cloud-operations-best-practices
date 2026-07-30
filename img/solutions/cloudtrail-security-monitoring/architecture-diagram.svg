@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 580" font-family="Arial, sans-serif" font-size="13">
+  <!-- Background -->
+  <rect width="900" height="580" fill="#f8f9fa" rx="8"/>
+
+  <!-- Title -->
+  <text x="450" y="32" text-anchor="middle" font-size="16" font-weight="bold" fill="#232f3e">CloudTrail Security Monitoring — Detection Architecture</text>
+
+  <!-- ── Row 1: Sources ── -->
+  <!-- AWS CloudTrail -->
+  <rect x="60" y="60" width="150" height="54" rx="6" fill="#FF9900" stroke="#e07b00" stroke-width="1.5"/>
+  <text x="135" y="82" text-anchor="middle" fill="white" font-weight="bold">AWS CloudTrail</text>
+  <text x="135" y="100" text-anchor="middle" fill="white" font-size="11">Management Events</text>
+
+  <!-- S3 Log Bucket -->
+  <rect x="60" y="160" width="150" height="54" rx="6" fill="#3F8624" stroke="#2d6119" stroke-width="1.5"/>
+  <text x="135" y="182" text-anchor="middle" fill="white" font-weight="bold">Amazon S3</text>
+  <text x="135" y="200" text-anchor="middle" fill="white" font-size="11">CloudTrail Log Bucket</text>
+
+  <!-- ── Row 1: Detection Layer ── -->
+  <!-- CloudWatch Logs -->
+  <rect x="290" y="60" width="150" height="54" rx="6" fill="#E7157B" stroke="#c01068" stroke-width="1.5"/>
+  <text x="365" y="82" text-anchor="middle" fill="white" font-weight="bold">CloudWatch Logs</text>
+  <text x="365" y="100" text-anchor="middle" fill="white" font-size="11">Log Group</text>
+
+  <!-- EventBridge -->
+  <rect x="290" y="160" width="150" height="54" rx="6" fill="#E7157B" stroke="#c01068" stroke-width="1.5"/>
+  <text x="365" y="182" text-anchor="middle" fill="white" font-weight="bold">Amazon EventBridge</text>
+  <text x="365" y="200" text-anchor="middle" fill="white" font-size="11">Default Event Bus</text>
+
+  <!-- ── Row 2: Processing ── -->
+  <!-- Metric Filters -->
+  <rect x="290" y="270" width="150" height="54" rx="6" fill="#7AA116" stroke="#5e7d10" stroke-width="1.5"/>
+  <text x="365" y="292" text-anchor="middle" fill="white" font-weight="bold">Metric Filters</text>
+  <text x="365" y="310" text-anchor="middle" fill="white" font-size="11">StopLogging / DeleteTrail</text>
+
+  <!-- CloudWatch Alarms -->
+  <rect x="290" y="370" width="150" height="54" rx="6" fill="#7AA116" stroke="#5e7d10" stroke-width="1.5"/>
+  <text x="365" y="392" text-anchor="middle" fill="white" font-weight="bold">CloudWatch Alarms</text>
+  <text x="365" y="410" text-anchor="middle" fill="white" font-size="11">Threshold breach</text>
+
+  <!-- ── SNS Topic (center) ── -->
+  <rect x="520" y="210" width="160" height="60" rx="6" fill="#FF9900" stroke="#e07b00" stroke-width="2"/>
+  <text x="600" y="235" text-anchor="middle" fill="white" font-weight="bold">Amazon SNS Topic</text>
+  <text x="600" y="255" text-anchor="middle" fill="white" font-size="11">AWS KMS-encrypted</text>
+
+  <!-- ── Lambda ── -->
+  <rect x="520" y="340" width="160" height="54" rx="6" fill="#FF9900" stroke="#e07b00" stroke-width="1.5"/>
+  <text x="600" y="362" text-anchor="middle" fill="white" font-weight="bold">AWS Lambda</text>
+  <text x="600" y="380" text-anchor="middle" fill="white" font-size="11">Auto-Remediation (optional)</text>
+
+  <!-- ── SQS DLQ ── -->
+  <rect x="520" y="440" width="160" height="54" rx="6" fill="#FF9900" stroke="#e07b00" stroke-width="1.5"/>
+  <text x="600" y="462" text-anchor="middle" fill="white" font-weight="bold">Amazon SQS</text>
+  <text x="600" y="480" text-anchor="middle" fill="white" font-size="11">Dead Letter Queue</text>
+
+  <!-- ── Security Team ── -->
+  <rect x="740" y="210" width="130" height="60" rx="6" fill="#232f3e" stroke="#111" stroke-width="1.5"/>
+  <text x="805" y="235" text-anchor="middle" fill="white" font-weight="bold">Security Team</text>
+  <text x="805" y="255" text-anchor="middle" fill="white" font-size="11">Email Alerts</text>
+
+  <!-- ── Arrows ── -->
+  <!-- CloudTrail → CloudWatch Logs -->
+  <line x1="210" y1="87" x2="288" y2="87" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="249" y="80" text-anchor="middle" font-size="10" fill="#555">logs</text>
+
+  <!-- CloudTrail → EventBridge -->
+  <line x1="210" y1="100" x2="270" y2="175" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="232" y="148" text-anchor="middle" font-size="10" fill="#555">events</text>
+
+  <!-- S3 → EventBridge -->
+  <line x1="210" y1="187" x2="288" y2="187" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="249" y="180" text-anchor="middle" font-size="10" fill="#555">events</text>
+
+  <!-- CloudWatch Logs → Metric Filters -->
+  <line x1="365" y1="114" x2="365" y2="268" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Metric Filters → CloudWatch Alarms -->
+  <line x1="365" y1="324" x2="365" y2="368" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- CloudWatch Alarms → SNS -->
+  <line x1="440" y1="397" x2="518" y2="255" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="490" y="340" text-anchor="middle" font-size="10" fill="#555">alarm</text>
+
+  <!-- EventBridge → SNS -->
+  <line x1="440" y1="187" x2="518" y2="230" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="490" y="200" text-anchor="middle" font-size="10" fill="#555">rule</text>
+
+  <!-- EventBridge → Lambda -->
+  <line x1="440" y1="200" x2="518" y2="360" stroke="#666" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
+  <text x="462" y="290" text-anchor="middle" font-size="10" fill="#555">StopLogging</text>
+
+  <!-- SNS → Security Team -->
+  <line x1="680" y1="240" x2="738" y2="240" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="709" y="233" text-anchor="middle" font-size="10" fill="#555">email</text>
+
+  <!-- Lambda → CloudTrail (StartLogging) -->
+  <line x1="520" y1="367" x2="210" y2="100" stroke="#3F8624" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowGreen)"/>
+  <text x="340" y="460" text-anchor="middle" font-size="10" fill="#3F8624">StartLogging</text>
+
+  <!-- Lambda → SQS DLQ -->
+  <line x1="600" y1="394" x2="600" y2="438" stroke="#666" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
+  <text x="630" y="420" text-anchor="middle" font-size="10" fill="#555">failures</text>
+
+  <!-- Legend -->
+  <rect x="60" y="510" width="780" height="50" rx="4" fill="#fff" stroke="#ddd" stroke-width="1"/>
+  <line x1="80" y1="535" x2="110" y2="535" stroke="#666" stroke-width="1.5"/>
+  <text x="115" y="539" font-size="11" fill="#555">Solid = always active</text>
+  <line x1="230" y1="535" x2="260" y2="535" stroke="#666" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="265" y="539" font-size="11" fill="#555">Dashed = optional (EnableAutoRemediation=true)</text>
+  <line x1="560" y1="535" x2="590" y2="535" stroke="#3F8624" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="595" y="539" font-size="11" fill="#3F8624">Green dashed = remediation path</text>
+
+  <!-- Arrow marker -->
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#666"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#3F8624"/>
+    </marker>
+  </defs>
+</svg>
