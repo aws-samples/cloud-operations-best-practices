@@ -14,6 +14,8 @@ people:
 | Isaiah Salinas      | Nereida Woo                 | Erik Weber           | Brad Gilomen       |
 | Justin Thomas       | Cheng-Lun Chen              | Steve Evernham       | Oscar Diaz         |
 | Caroline Johnston   | Mazzi Nabavi                | Jacky Fan            | Pal Patel          |
+| Jimmy Morgan        | Pujah Goviel                | Gautam Bhaghavatula  | Rodolfo Brenes     |
+| Yagya Vir Singh     |                             |                      |                    |
 | Jimmy Morgan        | Jake Izumi                  | Matej Macek          | Pujah Goviel       |
 | Gautam Bhaghavatula | Rodolfo Brenes              |                      |                    |
 
